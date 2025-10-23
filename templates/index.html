@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASABI_CHECK - 상품 리스트</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        /* (3) UI 클린업: 전체 폰트 및 배경 설정 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5; /* 밝은 회색 배경 */
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        /* (3) UI 클린업: 카드(Card) 스타일 */
+        .card {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            padding: 24px;
+        }
+        
+        h1 {
+            color: #2d8b57; /* Wasabi color */
+            margin: 0 0 24px 0;
+            text-align: center;
+            font-size: 2em;
+        }
+        h2 {
+            margin-top: 0;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        /* 알림 메시지 (Flash) */
+        .flash {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .flash.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        /* 검색바 */
+        .search-bar { display: flex; gap: 10px; }
+        .search-bar input[type="text"] {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+        .search-bar button {
+            padding: 0 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 1em;
+        }
+        .search-bar button:hover { background-color: #0056b3; }
+
+        /* 상품 리스트 */
+        .product-list { list-style: none; padding: 0; }
+        .product-list li { margin-bottom: 10px; }
+        .product-list a {
+            display: block;
+            padding: 16px;
+            text-decoration: none;
+            color: #333;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+        .product-list a:hover {
+            background-color: #fcfcfc;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .product-list .product-name { font-weight: 600; font-size: 1.1em; }
+        .product-list .product-number { font-size: 0.9em; color: #555; margin-top: 5px; }
+
+        /* (A6) 엑셀 임포트 폼 스타일 */
+        .import-section h3 { margin-top: 0; }
+        .import-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .import-form input[type="file"] {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .import-form button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .import-form button:hover { background-color: #c82333; }
+        
+        /* (A1) 바코드 스캔 스타일 */
+        #qr-reader {
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden; /* 스캐너 모서리 */
+        }
+        #scanner-controls { margin-top: 15px; display: flex; gap: 10px; }
+        #scanner-controls button {
+            flex-grow: 1;
+            background-color: #2d8b57;
+            color: white;
+            border: none;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 500;
+        }
+        #scanner-controls button.stop { background-color: #dc3545; }
+        #scanner-status {
+            margin-top: 15px;
+            font-weight: 500;
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            background-color: #f8f9fa;
+        }
+        #scanner-status.success { background-color: #d4edda; color: #155724; }
+        #scanner-status.error { background-color: #f8d7da; color: #721c24; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍣 WASABI_CHECK</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card" id="scanner-section">
+            <h2>바코드 스캔 (A1)</h2>
+            <div id="qr-reader"></div>
+            <div id="scanner-controls">
+                <button id="start-scan-btn">카메라 켜기 / 스캔 시작</button>
+                <button id="stop-scan-btn" class="stop" style="display: none;">스캔 중지</button>
+            </div>
+            <div id="scanner-status">카메라를 켜고 바코드를 스캔하세요.</div>
+        </div>
+
+        <div class="card">
+            <h2>상품 검색 (A3)</h2>
+            <div class="search-bar">
+                <form action="/" method="GET" style="display: contents;">
+                    <input type="text" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}">
+                    <button type="submit">검색</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            
+            {% if showing_favorites %}
+                <h2>즐겨찾기 목록</h2>
+            {% else %}
+                <h2>상품 검색 결과</h2>
+            {% endif %}
+
+            <ul class="product-list">
+                {% for product in products %}
+                    <li>
+                        <a href="{{ url_for('product_detail', product_number=product['product_number']) }}">
+                            <div class="product-name">{{ product['product_name'] }}</div>
+                            <div class="product-number">{{ product['product_number'] }}</div>
+                        </a>
+                    </li>
+                {% else %}
+                    {% if showing_favorites %}
+                        <li style="text-align: center; padding: 20px; color: #555;">즐겨찾기된 상품이 없습니다.</li>
+                    {% else %}
+                        <li style="text-align: center; padding: 20px; color: #555;">검색된 상품이 없습니다.</li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </div>
+        
+        <div class="card import-section">
+            <h3>DB 덮어쓰기 (엑셀 업로드)</h3>
+            <form action="{{ url_for('import_excel') }}" 
+                  method="POST" 
+                  enctype="multipart/form-data"
+                  class="import-form"
+                  onsubmit="return confirm('경고! DB를 덮어씁니다. 기존 데이터가 모두 삭제됩니다. 계속하시겠습니까?');">
+                
+                <input type="file" name="excel_file" accept=".xlsx, .xls" required>
+                <button type="submit">업로드 및 임포트</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const startBtn = document.getElementById('start-scan-btn');
+            const stopBtn = document.getElementById('stop-scan-btn');
+            const statusEl = document.getElementById('scanner-status');
+            let html5QrCode = null; // 스캐너 인스턴스
+
+            // 스캔 성공 시 호출되는 콜백 함수
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                console.log(`스캔 성공: ${decodedText}`);
+                statusEl.textContent = `스캔 성공: ${decodedText}. 서버에서 품번 조회 중...`;
+                statusEl.className = 'scanner-status success';
+                
+                stopScan();
+                
+                fetch("{{ url_for('barcode_search') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ barcode: decodedText })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        statusEl.textContent = `품번(${data.product_number})을 찾았습니다. 상세 페이지로 이동합니다.`;
+                        window.location.href = `/product/${data.product_number}`;
+                    } else {
+                        statusEl.textContent = `오류: ${data.message}`;
+                        statusEl.className = 'scanner-status error';
+                    }
+                })
+                .catch(error => {
+                    console.error('서버 통신 오류:', error);
+                    statusEl.textContent = '서버 통신 중 오류가 발생했습니다.';
+                    statusEl.className = 'scanner-status error';
+                });
+            };
+
+            // 스캔 시작 함수
+            function startScan() {
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("qr-reader");
+                }
+                
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    { fps: 10, qrbox: { width: 250, height: 100 } },
+                    qrCodeSuccessCallback,
+                    (errorMessage) => { }
+                ).then(() => {
+                    statusEl.textContent = "카메라가 켜졌습니다. 스캔 중...";
+                    statusEl.className = 'scanner-status';
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'inline-block';
+                }).catch((err) => {
+                    statusEl.textContent = `카메라를 시작할 수 없습니다: ${err}`;
+                    statusEl.className = 'scanner-status error';
+                });
+            }
+
+            // 스캔 중지 함수
+            function stopScan() {
+                if (html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop().then((ignore) => {
+                        console.log("스캔 중지됨");
+                        statusEl.textContent = "스캔이 중지되었습니다.";
+                        statusEl.className = 'scanner-status';
+                        startBtn.style.display = 'inline-block';
+                        stopBtn.style.display = 'none';
+                    }).catch((err) => {
+                        console.error("스캔 중지 실패", err);
+                    });
+                }
+            }
+            
+            startBtn.addEventListener('click', startScan);
+            stopBtn.addEventListener('click', stopScan);
+        });
+    </script>
+</body>
+</html>
