@@ -156,7 +156,7 @@
         {% endwith %}
 
         <div class="card" id="scanner-section">
-            <h2>바코드 스캔 (A1)</h2>
+            <h2>바코드 스캔</h2>
             <div id="qr-reader"></div>
             <div id="scanner-controls">
                 <button id="start-scan-btn">카메라 켜기 / 스캔 시작</button>
@@ -166,7 +166,7 @@
         </div>
 
         <div class="card">
-            <h2>상품 검색 (A3)</h2>
+            <h2>상품 검색</h2>
             <div class="search-bar">
                 <form action="/" method="GET" style="display: contents;">
                     <input type="text" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}">
@@ -186,9 +186,9 @@
             <ul class="product-list">
                 {% for product in products %}
                     <li>
-                        <a href="{{ url_for('product_detail', product_number=product['product_number']) }}">
-                            <div class="product-name">{{ product['product_name'] }}</div>
-                            <div class="product-number">{{ product['product_number'] }}</div>
+                        <a href="{{ url_for('product_detail', product_number=product.product_number) }}">
+                            <div class="product-name">{{ product.product_name }}</div>
+                            <div class="product-number">{{ product.product_number }}</div>
                         </a>
                     </li>
                 {% else %}

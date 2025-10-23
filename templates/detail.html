@@ -19,6 +19,8 @@
             padding: 24px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            /* (2) 연관 상품을 위해 컨테이너 마진 추가 */
+            margin-bottom: 20px;
         }
         
         /* (3) UI 클린업: 헤더 */
@@ -144,6 +146,36 @@
         .stock-quantity.zero { color: #dc3545; }
         .stock-hq { color: #555; }
         .discount { color: #dc3545; font-weight: 500; }
+        
+        /* (2) 연관 상품 리스트 스타일 */
+        .related-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .related-container h2 {
+            margin-top: 0;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .related-list { list-style: none; padding: 0; }
+        .related-list li { margin-bottom: 10px; }
+        .related-list a {
+            display: block;
+            padding: 16px;
+            text-decoration: none;
+            color: #333;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+        .related-list a:hover { background-color: #f8f9fa; }
+        .related-list .product-name { font-weight: 600; }
+        .related-list .product-number { font-size: 0.9em; color: #555; margin-top: 5px; }
 
     </style>
 </head>
@@ -186,7 +218,7 @@
                     <tr>
                         <th>컬러</th>
                         <th>사이즈</th>
-                        <th class="text-right">매장재고 (A5)</th>
+                        <th class="text-right">매장재고</th>
                         <th class="text-right">본사재고</th>
                         <th class="text-right">판매가</th>
                         <th class="text-right">최초가</th>
@@ -228,6 +260,23 @@
             </table>
         </div>
     </div>
+
+    {% if related_products %}
+    <div class="related-container">
+        <h2>연관 상품</h2>
+        <ul class="related-list">
+            {% for rel_prod in related_products %}
+            <li>
+                <a href="{{ url_for('product_detail', product_number=rel_prod.product_number) }}">
+                    <div class="product-name">{{ rel_prod.product_name }}</div>
+                    <div class="product-number">{{ rel_prod.product_number }}</div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
