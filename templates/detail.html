@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product['product_name'] }} - WASABI_CHECK</title>
+    <style>
+        /* (3) UI 클린업: 전체 폰트 및 배경 설정 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        /* (3) UI 클린업: 헤더 */
+        .header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+        }
+        .header .back-link {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: 500;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        /* (Req 3) 헤더 정렬 */
+        .header-main {
+            display: flex;
+            justify-content: space-between; /* 양쪽 정렬 */
+            align-items: flex-start;
+            gap: 15px;
+        }
+        .header-main h1 {
+            margin: 0 0 5px 0;
+            color: #333;
+            font-size: 2em;
+        }
+        .header-main .product-number {
+            color: #555;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+
+        /* (Req 3) 즐겨찾기 버튼 스타일 */
+        .btn-favorite {
+            background-color: #f0f2f5;
+            color: #333;
+            border: 1px solid #ddd;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            flex-shrink: 0; /* 버튼 크기 줄어들지 않게 */
+        }
+        .btn-favorite.favorited {
+            background-color: #fff3cd; /* 노란색 배경 */
+            border-color: #ffeeba;
+            color: #856404;
+        }
+        
+        /* (1) 상품 이미지 사이즈 고정 */
+        .product-image {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .product-image img {
+            width: 100%; /* 컨테이너 너비에 맞춤 */
+            height: 400px; /* (1) 높이 고정 */
+            object-fit: contain; /* (1) 비율 유지하며 내부에 맞춤 */
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background-color: #fdfdfd;
+        }
+        .product-image .error-text {
+            display: none;
+            color: #888;
+            padding: 40px 0;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        /* (3) UI 클린업: 재고 테이블 */
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse; /* 선을 하나로 합침 */
+            margin-top: 20px;
+            font-size: 0.95em;
+        }
+        .stock-table th, .stock-table td {
+            border-bottom: 1px solid #eee; /* 아래쪽 선만 표시 */
+            padding: 14px 10px; /* 여백 조정 */
+            text-align: left;
+            vertical-align: middle;
+        }
+        .stock-table th {
+            background-color: #f8f9fa;
+            color: #555;
+            font-weight: 600;
+        }
+        /* 테이블 헤더 첫번째/마지막 둥글게 */
+        .stock-table th:first-child { border-radius: 6px 0 0 6px; }
+        .stock-table th:last-child { border-radius: 0 6px 6px 0; }
+        
+        /* (3) UI 클린업: 숫자/가격 우측 정렬 */
+        .text-right { text-align: right !important; }
+        
+        /* (A5) 재고 수정 버튼 스타일 */
+        .stock-control { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+        .stock-control button {
+            width: 32px; height: 32px;
+            font-size: 1.1em; font-weight: bold;
+            border: 1px solid #ccc;
+            border-radius: 50%;
+            cursor: pointer;
+            background-color: #fff;
+            color: #333;
+            line-height: 28px;
+            transition: background-color 0.2s;
+        }
+        .stock-control button.btn-inc { color: #007bff; border-color: #007bff; }
+        .stock-control button.btn-dec { color: #dc3545; border-color: #dc3545; }
+        .stock-control button:hover { background-color: #f4f4f4; }
+        .stock-control button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .stock-quantity {
+            font-weight: 700;
+            font-size: 1.2em;
+            color: #2d8b57;
+            min-width: 30px;
+            text-align: center;
+        }
+        .stock-quantity.zero { color: #dc3545; }
+        .stock-hq { color: #555; }
+        .discount { color: #dc3545; font-weight: 500; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <div class="header">
+            <a href="{{ url_for('index') }}" class="back-link">&larr; 돌아가기</a>
+            
+            <div class="header-main">
+                <div>
+                    <h1>{{ product['product_name'] }}</h1>
+                    <div class="product-number">{{ product['product_number'] }}</div>
+                </div>
+                
+                <button id="fav-btn"
+                        class="btn-favorite {{ 'favorited' if product['is_favorite'] == 1 else '' }}"
+                        data-product-number="{{ product['product_number'] }}">
+                    
+                    {% if product['is_favorite'] == 1 %}
+                        ★ 즐겨찾기 해제
+                    {% else %}
+                        ☆ 즐겨찾기 추가
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+
+        <div class="product-image">
+            <img src="{{ image_url }}" alt="{{ product['product_name'] }} 이미지" 
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <p class="error-text">(이미지를 불러올 수 없습니다.)</p>
+        </div>
+
+        
+        <h2>재고 현황</h2>
+        <div style="overflow-x: auto;"> <table class="stock-table">
+                <thead>
+                    <tr>
+                        <th>바코드</th>
+                        <th>컬러</th>
+                        <th>사이즈</th>
+                        <th class="text-right">매장재고 (A5)</th>
+                        <th class="text-right">본사재고</th>
+                        <th class="text-right">판매가</th>
+                        <th class="text-right">최초가</th>
+                        <th class="text-right">할인율</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in variants %}
+                    <tr>
+                        <td>{{ item['barcode'] }}</td>
+                        <td>{{ item['color'] }}</td>
+                        <td>{{ item['size'] }}</td>
+                        
+                        <td class="text-right">
+                            <div class="stock-control">
+                                <button class="btn-dec" data-barcode="{{ item['barcode'] }}" data-change="-1">-</button>
+                                <span id="stock-{{ item['barcode'] }}" 
+                                      class="stock-quantity {{ 'zero' if item['store_stock'] == 0 else '' }}">
+                                    {{ item['store_stock'] }}
+                                </span>
+                                <button class="btn-inc" data-barcode="{{ item['barcode'] }}" data-change="1">+</button>
+                            </div>
+                        </td>
+                        
+                        <td class="text-right stock-hq">{{ item['hq_stock'] }}</td>
+                        <td class="text-right">{{ "{:,d}".format(item['sale_price']) }}원</td>
+                        <td class="text-right">{{ "{:,d}".format(item['original_price']) }}원</td>
+                        
+                        <td class="text-right discount">
+                            {{ (item['discount_rate'] | float * 100) | int }}%
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 20px;">이 상품의 재고 정보가 없습니다.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- (A5) 재고 수정 ---
+            const table = document.querySelector('.stock-table tbody');
+            if (table) {
+                table.addEventListener('click', function(e) {
+                    const button = e.target.closest('button');
+                    if (button && (button.classList.contains('btn-inc') || button.classList.contains('btn-dec'))) {
+                        
+                        const barcode = button.dataset.barcode;
+                        const change = parseInt(button.dataset.change, 10);
+
+                        const allButtonsInRow = button.parentElement.querySelectorAll('button');
+                        allButtonsInRow.forEach(btn => btn.disabled = true);
+                        
+                        updateStockOnServer(barcode, change, allButtonsInRow);
+                    }
+                });
+            }
+
+            // --- (Req 3) 즐겨찾기 ---
+            const favButton = document.getElementById('fav-btn');
+            if (favButton) {
+                favButton.addEventListener('click', function(e) {
+                    const button = e.target;
+                    const productNumber = button.dataset.productNumber;
+                    
+                    button.disabled = true; // 중복 클릭 방지
+                    toggleFavoriteOnServer(productNumber, button);
+                });
+            }
+        });
+
+        // (A5) 재고 수정 API 호출 함수
+        function updateStockOnServer(barcode, change, buttons) {
+            fetch("{{ url_for('update_stock') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcode: barcode, change: change })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const quantitySpan = document.getElementById(`stock-${data.barcode}`);
+                    quantitySpan.textContent = data.new_quantity;
+                    quantitySpan.classList.toggle('zero', data.new_quantity === 0);
+                } else {
+                    alert(`재고 오류: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('재고 API 오류:', error);
+                alert('서버와 통신 중 오류가 발생했습니다.');
+            })
+            .finally(() => {
+                buttons.forEach(btn => btn.disabled = false); // 버튼 활성화
+            });
+        }
+
+        // (Req 3) 즐겨찾기 API 호출 함수
+        function toggleFavoriteOnServer(productNumber, button) {
+            fetch("{{ url_for('toggle_favorite') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_number: productNumber })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 성공 시: 버튼 텍스트와 스타일 변경
+                    if (data.new_favorite_status === 1) {
+                        button.textContent = '★ 즐겨찾기 해제';
+                        button.classList.add('favorited');
+                    } else {
+                        button.textContent = '☆ 즐겨찾기 추가';
+                        button.classList.remove('favorited');
+                    }
+                } else {
+                    alert(`즐겨찾기 오류: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('즐겨찾기 API 오류:', error);
+                alert('서버와 통신 중 오류가 발생했습니다.');
+            })
+            .finally(() => {
+                button.disabled = false; // 버튼 활성화
+            });
+        }
+    </script>
+
+</body>
+</html>
