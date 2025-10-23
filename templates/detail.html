@@ -180,10 +180,10 @@
 
         
         <h2>재고 현황</h2>
-        <div style="overflow-x: auto;"> <table class="stock-table">
+        <div style="overflow-x: auto;"> 
+            <table class="stock-table">
                 <thead>
                     <tr>
-                        <th>바코드</th>
                         <th>컬러</th>
                         <th>사이즈</th>
                         <th class="text-right">매장재고 (A5)</th>
@@ -196,7 +196,6 @@
                 <tbody>
                     {% for item in variants %}
                     <tr>
-                        <td>{{ item.barcode }}</td>
                         <td>{{ item.color }}</td>
                         <td>{{ item.size }}</td>
                         
@@ -212,8 +211,9 @@
                         </td>
                         
                         <td class="text-right stock-hq">{{ item.hq_stock }}</td>
-                        <td class="text-right">{{ "{:,d}".format(item.sale_price) }}원</td>
-                        <td class="text-right">{{ "{:,d}".format(item.original_price) }}원</td>
+                        
+                        <td class="text-right">{{ "{:,d}".format(item.sale_price) }}</td>
+                        <td class="text-right">{{ "{:,d}".format(item.original_price) }}</td>
                         
                         <td class="text-right discount">
                             {{ (item.discount_rate | float * 100) | int }}%
@@ -221,7 +221,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" style="text-align: center; padding: 20px;">이 상품의 재고 정보가 없습니다.</td>
+                        <td colspan="7" style="text-align: center; padding: 20px;">이 상품의 재고 정보가 없습니다.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -232,7 +232,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            // --- (A5) 재고 수정 (*** 수정된 부분 ***) ---
+            // --- (A5) 재고 수정 ---
             const table = document.querySelector('.stock-table tbody');
             if (table) {
                 table.addEventListener('click', function(e) {
@@ -252,7 +252,6 @@
                             
                             updateStockOnServer(barcode, change, allButtonsInRow);
                         }
-                        // else: "취소"를 누르면 아무것도 하지 않음
                     }
                 });
             }
@@ -264,7 +263,7 @@
                     const button = e.target;
                     const productNumber = button.dataset.productNumber;
                     
-                    button.disabled = true; // 중복 클릭 방지
+                    button.disabled = true; 
                     toggleFavoriteOnServer(productNumber, button);
                 });
             }
