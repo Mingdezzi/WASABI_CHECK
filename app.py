@@ -144,6 +144,37 @@ def index():
     return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
 
 
+# (*** 1. 수정: 사이즈 정렬을 위한 헬퍼 함수 ***)
+def get_sort_key(variant):
+    """
+    (Req 1) 사이즈 정렬을 위한 커스텀 정렬 키 함수
+    1순위: 컬러 (ABC 순)
+    2순위: 사이즈 (숫자 -> 커스텀 알파벳 -> 기타 알파벳 순)
+    """
+    color = variant.color or ''
+    size_str = str(variant.size).upper().strip()
+    
+    # (b) 알파벳 사이즈 동의어 처리 (2XS -> XXS)
+    if size_str == '2XS': size_str = 'XXS'
+    if size_str == '2XL': size_str = 'XXL'
+    if size_str == '3XL': size_str = 'XXXL'
+    
+    # (b) 커스텀 알파벳 순서 정의
+    custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
+    
+    # (a) 사이즈가 숫자인 경우
+    if size_str.isdigit():
+        sort_key = (1, int(size_str), '')
+    # (b) 사이즈가 커스텀 알파벳인 경우
+    elif size_str in custom_order:
+        sort_key = (2, custom_order.index(size_str), '')
+    # (c) 그 외 (일반 알파벳)
+    else:
+        sort_key = (3, 0, size_str)
+        
+    return (color, sort_key)
+
+
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
@@ -154,11 +185,31 @@ def product_detail(product_number):
         
     image_url = f"{IMAGE_URL_PREFIX}{product.product_number}.jpg"
     
-    variants_list = sorted(product.variants, key=lambda v: (v.color or '', v.size or ''))
+    # (*** 1. 수정: 커스텀 정렬 적용 ***)
+    # 기존: sorted(product.variants, key=lambda v: (v.color or '', v.size or ''))
+    variants_list = sorted(product.variants, key=get_sort_key)
     
-    return render_template('detail.html', product=product, image_url=image_url, variants=variants_list)
+    # (*** 2. 수정: 연관 상품 로직 추가 ***)
+    related_products = []
+    if product.product_name:
+        search_words = product.product_name.split(' ')
+        if len(search_words) > 0:
+            # 품명에서 마지막 단어(예: '티셔츠')를 검색어로 사용
+            search_term = search_words[-1] 
+            if len(search_term) > 1: # 1글자짜리 단어는 무시
+                related_products = Product.query.filter(
+                    Product.product_name.ilike(f'%{search_term}%'),  # 비슷한 품명
+                    Product.product_number != product_number       # 현재 상품 제외
+                ).limit(5).all() # 최대 5개
 
-# (*** 1. 수정된 부분 ***)
+    return render_template(
+        'detail.html', 
+        product=product, 
+        image_url=image_url, 
+        variants=variants_list,
+        related_products=related_products # (2) 연관 상품 리스트 전달
+    )
+
 @app.route('/barcode_search', methods=['POST'])
 def barcode_search():
     """ (A1) 바코드 스캔 API (15자리 부분 일치) """
@@ -168,17 +219,13 @@ def barcode_search():
     if not barcode:
         return jsonify({'status': 'error', 'message': '바코드가 전송되지 않았습니다.'}), 400
         
-    # (*** 1. 수정된 부분 ***)
-    # 스캔된 바코드의 '앞 15자리'만 잘라서 사용
     search_barcode = barcode[:15] 
     
-    # 15자리 코드로 variants 테이블(DB)을 검색
     variant = Variant.query.filter_by(barcode=search_barcode).first()
     
     if variant:
         return jsonify({'status': 'success', 'product_number': variant.product_number})
     else:
-        # 15자리로도 못 찾은 경우
         return jsonify({'status': 'error', 'message': f'해당 바코드({search_barcode})를 찾을 수 없습니다.'}), 404
 
 @app.route('/update_stock', methods=['POST'])
