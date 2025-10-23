@@ -1,0 +1,7 @@
+Flask
+pandas
+openpyxl
+Flask-SQLAlchemy
+SQLAlchemy
+psycopg2-binary
+gunicorn
