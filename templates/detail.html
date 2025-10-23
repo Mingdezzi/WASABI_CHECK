@@ -243,10 +243,8 @@
                         const change = parseInt(button.dataset.change, 10);
                         const changeText = change === 1 ? "증가" : "감소";
 
-                        // (*** 1. 확인 창 띄우기 ***)
                         if (confirm(`[${barcode}] 상품의 재고를 1 ${changeText}시키겠습니까?`)) {
                             
-                            // (*** 2. "확인"을 누른 경우에만 실행 ***)
                             const allButtonsInRow = button.parentElement.querySelectorAll('button');
                             allButtonsInRow.forEach(btn => btn.disabled = true);
                             
