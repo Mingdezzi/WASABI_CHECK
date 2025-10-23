@@ -160,10 +160,10 @@
                 </div>
                 
                 <button id="fav-btn"
-                        class="btn-favorite {{ 'favorited' if product['is_favorite'] == 1 else '' }}"
-                        data-product-number="{{ product['product_number'] }}">
+                        class="btn-favorite {{ 'favorited' if product.is_favorite == 1 else '' }}"
+                        data-product-number="{{ product.product_number }}">
                     
-                    {% if product['is_favorite'] == 1 %}
+                    {% if product.is_favorite == 1 %}
                         ★ 즐겨찾기 해제
                     {% else %}
                         ☆ 즐겨찾기 추가
@@ -196,27 +196,27 @@
                 <tbody>
                     {% for item in variants %}
                     <tr>
-                        <td>{{ item['barcode'] }}</td>
-                        <td>{{ item['color'] }}</td>
-                        <td>{{ item['size'] }}</td>
+                        <td>{{ item.barcode }}</td>
+                        <td>{{ item.color }}</td>
+                        <td>{{ item.size }}</td>
                         
                         <td class="text-right">
                             <div class="stock-control">
-                                <button class="btn-dec" data-barcode="{{ item['barcode'] }}" data-change="-1">-</button>
-                                <span id="stock-{{ item['barcode'] }}" 
-                                      class="stock-quantity {{ 'zero' if item['store_stock'] == 0 else '' }}">
-                                    {{ item['store_stock'] }}
+                                <button class="btn-dec" data-barcode="{{ item.barcode }}" data-change="-1">-</button>
+                                <span id="stock-{{ item.barcode }}" 
+                                      class="stock-quantity {{ 'zero' if item.store_stock == 0 else '' }}">
+                                    {{ item.store_stock }}
                                 </span>
-                                <button class="btn-inc" data-barcode="{{ item['barcode'] }}" data-change="1">+</button>
+                                <button class="btn-inc" data-barcode="{{ item.barcode }}" data-change="1">+</button>
                             </div>
                         </td>
                         
-                        <td class="text-right stock-hq">{{ item['hq_stock'] }}</td>
-                        <td class="text-right">{{ "{:,d}".format(item['sale_price']) }}원</td>
-                        <td class="text-right">{{ "{:,d}".format(item['original_price']) }}원</td>
+                        <td class="text-right stock-hq">{{ item.hq_stock }}</td>
+                        <td class="text-right">{{ "{:,d}".format(item.sale_price) }}원</td>
+                        <td class="text-right">{{ "{:,d}".format(item.original_price) }}원</td>
                         
                         <td class="text-right discount">
-                            {{ (item['discount_rate'] | float * 100) | int }}%
+                            {{ (item.discount_rate | float * 100) | int }}%
                         </td>
                     </tr>
                     {% else %}
@@ -232,7 +232,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            // --- (A5) 재고 수정 ---
+            // --- (A5) 재고 수정 (*** 수정된 부분 ***) ---
             const table = document.querySelector('.stock-table tbody');
             if (table) {
                 table.addEventListener('click', function(e) {
@@ -241,11 +241,18 @@
                         
                         const barcode = button.dataset.barcode;
                         const change = parseInt(button.dataset.change, 10);
+                        const changeText = change === 1 ? "증가" : "감소";
 
-                        const allButtonsInRow = button.parentElement.querySelectorAll('button');
-                        allButtonsInRow.forEach(btn => btn.disabled = true);
-                        
-                        updateStockOnServer(barcode, change, allButtonsInRow);
+                        // (*** 1. 확인 창 띄우기 ***)
+                        if (confirm(`[${barcode}] 상품의 재고를 1 ${changeText}시키겠습니까?`)) {
+                            
+                            // (*** 2. "확인"을 누른 경우에만 실행 ***)
+                            const allButtonsInRow = button.parentElement.querySelectorAll('button');
+                            allButtonsInRow.forEach(btn => btn.disabled = true);
+                            
+                            updateStockOnServer(barcode, change, allButtonsInRow);
+                        }
+                        // else: "취소"를 누르면 아무것도 하지 않음
                     }
                 });
             }
