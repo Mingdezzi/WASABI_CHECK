@@ -2,9 +2,8 @@ import sqlite3
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for, g, flash, jsonify
 import io 
-import os # (추가) 환경 변수(DATABASE_URL)를 읽기 위해
+import os 
 
-# --- (1. SQLAlchemy 설정으로 변경) ---
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -15,9 +14,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'sqlite:///' + os.path.join(app.root_path, 'database.db')
 )
 app.config['SECRET_KEY'] = 'wasabi-check-secret-key'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # 권장 설정
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 
-db = SQLAlchemy(app) # DB 객체 생성
+db = SQLAlchemy(app) 
 
 IMAGE_URL_PREFIX = 'https://files.ebizway.co.kr/files/10249/Style/'
 
@@ -131,10 +130,13 @@ def index():
 
     if query:
         search_term = f'%{query}%'
+        
+        # (A3) 대소문자 구분 없이 검색 (.ilike)
         products = Product.query.filter(
-            (Product.product_number.like(search_term)) | 
-            (Product.product_name.like(search_term))
+            (Product.product_number.ilike(search_term)) | 
+            (Product.product_name.ilike(search_term))
         ).order_by(Product.product_name).all()
+        
     else:
         showing_favorites = True
         products = Product.query.filter_by(is_favorite=1).order_by(Product.product_name).all()
@@ -156,20 +158,28 @@ def product_detail(product_number):
     
     return render_template('detail.html', product=product, image_url=image_url, variants=variants_list)
 
+# (*** 1. 수정된 부분 ***)
 @app.route('/barcode_search', methods=['POST'])
 def barcode_search():
+    """ (A1) 바코드 스캔 API (15자리 부분 일치) """
     data = request.json
-    barcode = data.get('barcode')
+    barcode = data.get('barcode') # 예: 18자리 스캔
     
     if not barcode:
         return jsonify({'status': 'error', 'message': '바코드가 전송되지 않았습니다.'}), 400
         
-    variant = Variant.query.filter_by(barcode=barcode).first()
+    # (*** 1. 수정된 부분 ***)
+    # 스캔된 바코드의 '앞 15자리'만 잘라서 사용
+    search_barcode = barcode[:15] 
+    
+    # 15자리 코드로 variants 테이블(DB)을 검색
+    variant = Variant.query.filter_by(barcode=search_barcode).first()
     
     if variant:
         return jsonify({'status': 'success', 'product_number': variant.product_number})
     else:
-        return jsonify({'status': 'error', 'message': '해당 바코드를 찾을 수 없습니다.'}), 404
+        # 15자리로도 못 찾은 경우
+        return jsonify({'status': 'error', 'message': f'해당 바코드({search_barcode})를 찾을 수 없습니다.'}), 404
 
 @app.route('/update_stock', methods=['POST'])
 def update_stock():
@@ -230,7 +240,7 @@ def toggle_favorite():
         return jsonify({'status': 'error', 'message': f'서버 오류 발생: {e}'}), 500
 
 
-# --- (*** 1. 신규 추가: DB 초기화 명령어 ***) ---
+# --- (DB 초기화 명령어) ---
 @app.cli.command("init-db")
 def init_db_command():
     """CLI에서 'flask init-db'를 실행하면 DB 테이블을 생성합니다."""
@@ -239,6 +249,4 @@ def init_db_command():
 
 # --- 앱 실행 ---
 if __name__ == '__main__':
-    # (*** 2. 삭제: init_db() 호출을 여기서 제거 ***)
-    # init_db() # <-- Gunicorn은 이 부분을 실행하지 않으므로, 여기서 호출하면 안 됨.
     app.run(debug=True, host='0.0.0.0', port=5000)
