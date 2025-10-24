@@ -149,25 +149,32 @@ def ocr_upload():
             print(f"Found Product Number Candidates: {matches}")
 
             if matches:
-                search_text_raw = matches[0] # 찾은 첫 번째 후보 (하이픈 포함 가능)
-                
-                # (*** 1. 하이픈 제거 ***)
-                search_text_cleaned = search_text_raw.replace('-', '')
+                search_text_raw = matches[0] # 찾은 첫 번째 후보 (예: M25W1-UOL731...)
 
-                # (*** 2. DB 검색 방식 변경 ***)
-                # DB의 product_number에서도 하이픈 제거 후, cleaned로 시작하는지 검색
+                # (*** 1. 하이픈 제거 후 앞 11자리 추출 ***)
+                cleaned_candidate = search_text_raw.replace('-', '')
+                search_prefix = cleaned_candidate[:11] # 앞 11자리만 사용
+
+                # (*** 2. 11자리 미만이면 에러 처리 ***)
+                if len(search_prefix) < 11:
+                     return jsonify({'status': 'error', 'message': f'찾은 품번 패턴 "{search_text_raw}"이 너무 짧습니다(11자리 필요).'}), 400
+
+                print(f"Searching DB with cleaned 11-char prefix: {search_prefix}") # 디버깅용
+
+                # (*** 3. DB 검색 방식 변경: 11자리 prefix로 검색 ***)
+                # DB의 product_number에서도 하이픈 제거 후, 11자리 prefix로 시작하는지 검색
                 results = Product.query.filter(
-                    func.replace(Product.product_number, '-', '').startswith(search_text_cleaned)
+                    func.replace(Product.product_number, '-', '').startswith(search_prefix)
                 ).all()
-                print(f"Searching DB with cleaned prefix: {search_text_cleaned}, Found: {len(results)}") # 디버깅용
+                print(f"Found: {len(results)}") # 디버깅용
 
                 if len(results) == 1:
                     return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
                 elif len(results) > 1:
-                    # 여러 개 찾으면 원본(하이픈 포함 가능)으로 검색 결과 보여주기
+                    # 여러 개 찾으면 원본 패턴(하이픈 포함 가능)으로 검색 결과 보여주기
                     return jsonify({'status': 'found_many', 'query': search_text_raw})
                 else:
-                    return jsonify({'status': 'not_found', 'message': f'"{search_text_raw}" 시작 상품 없음.'}), 404
+                    return jsonify({'status': 'not_found', 'message': f'"{search_prefix}"(으)로 시작하는 상품 없음.'}), 404
             else:
                 return jsonify({'status': 'error', 'message': 'OCR 결과에서 품번 패턴(M...) 못 찾음.'}), 400
         except Exception as e:
