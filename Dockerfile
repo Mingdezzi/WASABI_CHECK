@@ -4,30 +4,23 @@ FROM python:3.13-slim
 # 2. 작업 디렉토리 설정
 WORKDIR /app
 
-# 3. 시스템 패키지 설치 (Tesseract OCR 등) - 첫 번째 RUN
+# 3. (*** 수정: Tesseract 설치 부분 삭제 ***)
+#    시스템 패키지는 psycopg2 빌드용만 남김
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    tesseract-ocr-kor \
-    tesseract-ocr-eng \
-    libtesseract-dev \
-    # 필요한 빌드 도구
     gcc \
     libpq-dev && \
-    # 설치 후 캐시 정리
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# 4. requirements.txt 복사 및 파이썬 라이브러리 설치 - 두 번째 RUN
+# 4. requirements.txt 복사 및 파이썬 라이브러리 설치
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 5. 앱 코드 전체 복사
 COPY . .
 
-# 6. 환경 변수 설정 (Gunicorn 설정) - (*** 이 줄 삭제 ***)
-# ENV GUNICORN_CMD_ARGS="--workers 1 --bind 0.0.0.0:$PORT app:app"
+# 6. 환경 변수 설정 (Gunicorn 설정) - 삭제됨
 
-# 7. 앱 실행 명령어 - (*** 수정된 부분 ***)
-#    Gunicorn 실행 시 --bind 옵션에 $PORT 직접 사용
+# 7. 앱 실행 명령어
 CMD flask init-db && gunicorn --workers 1 --bind 0.0.0.0:$PORT app:app

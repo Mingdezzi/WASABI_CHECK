@@ -6,5 +6,5 @@ SQLAlchemy
 psycopg2-binary
 gunicorn
 APScheduler
-pytesseract
 Pillow
+google-cloud-vision # <-- 추가
