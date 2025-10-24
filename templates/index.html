@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WASABI_CHECK - 상품 리스트</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-    
     <style>
         /* (이전과 동일) */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
@@ -30,11 +28,15 @@
         .import-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .import-form input[type="file"] { flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
         .import-form button { background-color: #dc3545; color: white; border: none; padding: 12px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        #scan-file-btn { width: 100%; background-color: #2d8b57; color: white; border: none; padding: 15px; cursor: pointer; border-radius: 6px; font-size: 1.1em; font-weight: 600; }
+        
+        /* (*** 복원: 실시간 스캔 스타일 ***) */
+        #qr-reader { width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        #scanner-controls { margin-top: 15px; display: flex; gap: 10px; }
+        #scanner-controls button { flex-grow: 1; background-color: #2d8b57; color: white; border: none; padding: 12px; cursor: pointer; border-radius: 6px; font-size: 1em; font-weight: 500; }
+        #scanner-controls button.stop { background-color: #dc3545; }
         #scanner-status { margin-top: 15px; font-weight: 500; text-align: center; padding: 10px; border-radius: 6px; background-color: #f8f9fa; }
         #scanner-status.success { background-color: #d4edda; color: #155724; }
         #scanner-status.error { background-color: #f8d7da; color: #721c24; }
-        #scanner-status.loading { background-color: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
@@ -50,10 +52,13 @@
         {% endwith %}
 
         <div class="card" id="scanner-section">
-            <h2>바코드 스캔 / OCR</h2>
-            <button id="scan-file-btn">바코드/텍스트 사진 찍기</button>
-            <input type="file" id="qr-file-input" accept="image/*" capture style="display: none;">
-            <div id="scanner-status">버튼을 눌러 카메라를 여세요.</div>
+            <h2>바코드 스캔</h2>
+            <div id="qr-reader"></div>
+            <div id="scanner-controls">
+                <button id="start-scan-btn">카메라 켜기 / 스캔 시작</button>
+                <button id="stop-scan-btn" class="stop" style="display: none;">스캔 중지</button>
+            </div>
+            <div id="scanner-status">카메라를 켜고 바코드를 스캔하세요.</div>
         </div>
 
         <div class="card">
@@ -88,55 +93,18 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', (event) => {
-            const scanBtn = document.getElementById('scan-file-btn');
-            const fileInput = document.getElementById('qr-file-input');
+            const startBtn = document.getElementById('start-scan-btn');
+            const stopBtn = document.getElementById('stop-scan-btn');
             const statusEl = document.getElementById('scanner-status');
-            
-            scanBtn.addEventListener('click', () => { fileInput.click(); });
+            let html5QrCode = null; // 스캐너 인스턴스
 
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length == 0) { statusEl.textContent = "취소되었습니다."; statusEl.className = 'scanner-status'; return; }
-                
-                statusEl.textContent = "사진 분석 중... (바코드 먼저)"; statusEl.className = 'scanner-status loading';
-                const imageFile = e.target.files[0];
-                
-                // (*** 1. 바코드 형식 CODE_128 지정 ***)
-                const html5QrCode = new Html5Qrcode("qr-reader", { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] });
-
-                // 2. 바코드 스캔 시도
-                html5QrCode.scanFile(imageFile, true)
-                    .then(decodedText => {
-                        // 2-1. 바코드 성공 -> 서버 전송
-                        handleBarcodeSuccess(decodedText);
-                    })
-                    .catch(err => {
-                        // 2-2. 바코드 실패 -> OCR 시도
-                        statusEl.textContent = "바코드 실패. OCR(텍스트 인식) 시도 중...";
-                        statusEl.className = 'scanner-status loading';
-                        console.warn("바코드 스캔 실패:", err);
-                        
-                        // 3. Tesseract.js로 OCR 시도
-                        Tesseract.recognize(
-                            imageFile,
-                            'kor+eng', // 한국어 + 영어 인식
-                            { logger: m => console.log(m) } // (선택) 진행률 콘솔 출력
-                        ).then(({ data: { text } }) => {
-                            // 3-1. OCR 성공 -> 서버 전송
-                            handleOcrSuccess(text);
-                        }).catch(ocrErr => {
-                            // 3-2. OCR 마저 실패
-                            statusEl.textContent = `OCR 실패: ${ocrErr}`;
-                            statusEl.className = 'scanner-status error';
-                        });
-                    })
-                    .finally(() => { fileInput.value = null; });
-            });
-
-            // 바코드 성공 시 서버 전송 함수
-            function handleBarcodeSuccess(decodedText) {
-                console.log(`바코드 성공: ${decodedText}`);
-                statusEl.textContent = `바코드 성공: ${decodedText}. 서버에서 품번 조회 중...`;
+            // 스캔 성공 시 서버 전송
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                console.log(`스캔 성공: ${decodedText}`);
+                statusEl.textContent = `스캔 성공: ${decodedText}. 서버에서 품번 조회 중...`;
                 statusEl.className = 'scanner-status success';
+                
+                stopScan(); // 성공하면 스캔 중지
                 
                 fetch("{{ url_for('barcode_search') }}", {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText })
@@ -149,34 +117,52 @@
                     } else { statusEl.textContent = `바코드 오류: ${data.message}`; statusEl.className = 'scanner-status error'; }
                 })
                 .catch(error => { console.error('바코드 API 오류:', error); statusEl.textContent = '서버 통신 오류 (바코드)'; statusEl.className = 'scanner-status error'; });
+            };
+
+            // 스캔 시작 함수
+            function startScan() {
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("qr-reader");
+                }
+                
+                // (*** CODE_128 형식만 지정 ***)
+                const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128 ];
+
+                html5QrCode.start(
+                    { facingMode: "environment" }, // 후면 카메라
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 100 },
+                        formatsToSupport: formatsToSupport // 형식 지정
+                    },
+                    qrCodeSuccessCallback,
+                    (errorMessage) => { /* 스캔 중 오류 무시 */ }
+                ).then(() => {
+                    statusEl.textContent = "카메라가 켜졌습니다. 스캔 중...";
+                    statusEl.className = 'scanner-status';
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'inline-block';
+                }).catch((err) => {
+                    statusEl.textContent = `카메라 시작 불가: ${err}`;
+                    statusEl.className = 'scanner-status error';
+                });
             }
 
-            // OCR 성공 시 서버 전송 함수
-            function handleOcrSuccess(ocrText) {
-                ocrText = ocrText.trim(); // 앞뒤 공백 제거
-                console.log(`OCR 성공: ${ocrText}`);
-                statusEl.textContent = `OCR 성공: "${ocrText}". 서버에서 상품 검색 중...`;
-                statusEl.className = 'scanner-status success';
-
-                if (!ocrText) { statusEl.textContent = "OCR 결과가 비어있습니다."; statusEl.className = 'scanner-status error'; return; }
-
-                fetch("{{ url_for('text_search') }}", { // (*** 신규 API 호출 ***)
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: ocrText })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'found_one') { // 1개 찾음
-                        statusEl.textContent = `상품(${data.product_number})을 찾았습니다. 상세 페이지로 이동합니다.`;
-                        window.location.href = `/product/${data.product_number}`;
-                    } else if (data.status === 'found_many') { // 여러 개 찾음
-                        statusEl.textContent = `"${data.query}" 포함 상품이 여러 개 있습니다. 검색 결과로 이동합니다.`;
-                        window.location.href = `/?query=${encodeURIComponent(data.query)}`; // 검색 결과 페이지로
-                    } else { // 못 찾음 (not_found)
-                        statusEl.textContent = `OCR 검색 오류: ${data.message}`; statusEl.className = 'scanner-status error';
-                    }
-                })
-                .catch(error => { console.error('텍스트 검색 API 오류:', error); statusEl.textContent = '서버 통신 오류 (OCR)'; statusEl.className = 'scanner-status error'; });
+            // 스캔 중지 함수
+            function stopScan() {
+                if (html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop().then((ignore) => {
+                        console.log("스캔 중지됨");
+                        statusEl.textContent = "스캔이 중지되었습니다.";
+                        statusEl.className = 'scanner-status';
+                        startBtn.style.display = 'inline-block';
+                        stopBtn.style.display = 'none';
+                    }).catch((err) => { console.error("스캔 중지 실패", err); });
+                }
             }
+            
+            startBtn.addEventListener('click', startScan);
+            stopBtn.addEventListener('click', stopScan);
         });
     </script>
 </body>
