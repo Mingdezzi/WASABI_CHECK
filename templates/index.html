@@ -31,23 +31,16 @@
         .import-form input[type="file"] { flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
         .import-form button { background-color: #dc3545; color: white; border: none; padding: 12px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
 
-        /* (*** 수정: 스캔 버튼 스타일 ***) */
+        /* 스캔 버튼 스타일 */
         #qr-reader { width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
-        #scanner-controls { display: flex; gap: 10px; flex-wrap: wrap; } /* wrap 추가 */
-        #scanner-controls button {
-            flex-grow: 1; /* 버튼 너비 균등 분할 */
-            background-color: #2d8b57; color: white; border: none; padding: 12px;
-            cursor: pointer; border-radius: 6px; font-size: 1em; font-weight: 500;
-            min-width: 150px; /* 최소 너비 */
-        }
+        #scanner-controls { display: flex; gap: 10px; flex-wrap: wrap; }
+        #scanner-controls button { flex-grow: 1; background-color: #2d8b57; color: white; border: none; padding: 12px; cursor: pointer; border-radius: 6px; font-size: 1em; font-weight: 500; min-width: 150px; }
         #scanner-controls button#stop-scan-btn { background-color: #dc3545; }
         #scanner-status { margin-top: 15px; font-weight: 500; text-align: center; padding: 10px; border-radius: 6px; background-color: #f8f9fa; }
         #scanner-status.success { background-color: #d4edda; color: #155724; }
         #scanner-status.error { background-color: #f8d7da; color: #721c24; }
         #scanner-status.loading { background-color: #fff3cd; color: #856404; }
-        /* OCR 결과 표시용 (선택 사항) */
         #ocr-result { font-style: italic; color: #555; margin-top: 5px; font-size: 0.9em;}
-
     </style>
 </head>
 <body>
@@ -110,12 +103,12 @@
             const ocrBtn = document.getElementById('start-ocr-scan-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
             const statusEl = document.getElementById('scanner-status');
-            const ocrResultEl = document.getElementById('ocr-result'); // OCR 결과 표시
-            const videoEl = document.getElementById('qr-reader'); // 비디오 영역
+            const ocrResultEl = document.getElementById('ocr-result'); 
+            const videoEl = document.getElementById('qr-reader'); 
             
-            let html5QrCode = null; // 바코드 스캐너 인스턴스
-            let tesseractWorker = null; // OCR 워커 인스턴스
-            let ocrIntervalId = null; // 실시간 OCR 인터벌 ID
+            let html5QrCode = null; 
+            let tesseractWorker = null; 
+            let ocrIntervalId = null; 
 
             // --- 공통 함수 ---
             function showVideo() { videoEl.style.display = 'block'; }
@@ -126,28 +119,24 @@
             // 스캔 중지 함수 (공통)
             async function stopScan() {
                 statusEl.textContent = "스캔 중지 중...";
-                // 1. 실시간 OCR 중지
                 if (ocrIntervalId) { clearInterval(ocrIntervalId); ocrIntervalId = null; }
                 if (tesseractWorker) { await tesseractWorker.terminate(); tesseractWorker = null; console.log("Tesseract worker terminated."); }
                 
-                // 2. 바코드 스캐너 중지
                 if (html5QrCode && html5QrCode.isScanning) {
-                    try {
-                        await html5QrCode.stop();
-                        console.log("Barcode scanner stopped.");
-                    } catch (err) { console.error("Barcode scanner stop failed", err); }
+                    try { await html5QrCode.stop(); console.log("Barcode scanner stopped."); } 
+                    catch (err) { console.error("Barcode scanner stop failed", err); }
                 }
                 
                 hideVideo();
                 showStartButtons();
                 statusEl.textContent = "스캔이 중지되었습니다.";
                 statusEl.className = 'scanner-status';
-                ocrResultEl.textContent = ''; // OCR 결과 초기화
+                ocrResultEl.textContent = ''; 
             }
 
             // --- 바코드 스캔 관련 ---
             async function startBarcodeScan() {
-                if (html5QrCode && html5QrCode.isScanning) await stopScan(); // 다른 스캔 중이면 중지
+                if (html5QrCode && html5QrCode.isScanning) await stopScan(); 
                 
                 statusEl.textContent = "바코드 스캔 시작 중..."; statusEl.className = 'scanner-status loading';
                 showVideo();
@@ -159,73 +148,62 @@
                     await html5QrCode.start(
                         { facingMode: "environment" }, 
                         { fps: 10, qrbox: { width: 250, height: 100 }, formatsToSupport: formatsToSupport },
-                        handleBarcodeSuccess, // 성공 콜백
+                        handleBarcodeSuccess, 
                         (errorMessage) => { /* 오류 무시 */ }
                     );
                     statusEl.textContent = "카메라 켜짐 (바코드 스캔 중...)"; statusEl.className = 'scanner-status';
                     showStopButton();
                 } catch (err) {
                     statusEl.textContent = `카메라 시작 불가: ${err}`; statusEl.className = 'scanner-status error';
-                    hideVideo();
-                    showStartButtons();
+                    hideVideo(); showStartButtons();
                 }
             }
             
-            // 바코드 성공 시 서버 전송
             function handleBarcodeSuccess(decodedText) {
-                stopScan(); // 성공 시 자동 중지
+                stopScan(); 
                 console.log(`바코드 성공: ${decodedText}`);
                 statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`; statusEl.className = 'scanner-status success';
                 
                 fetch("{{ url_for('barcode_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText }) })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status === 'success') {
-                        statusEl.textContent = `품번(${data.product_number}) 찾음. 이동합니다.`;
-                        window.location.href = `/product/${data.product_number}`;
-                    } else { statusEl.textContent = `바코드 오류: ${data.message}`; statusEl.className = 'scanner-status error'; showStartButtons(); } // 오류 시 시작 버튼 다시 표시
+                    if (data.status === 'success') { statusEl.textContent = `품번(${data.product_number}) 찾음. 이동합니다.`; window.location.href = `/product/${data.product_number}`; } 
+                    else { statusEl.textContent = `바코드 오류: ${data.message}`; statusEl.className = 'scanner-status error'; showStartButtons(); }
                 })
                 .catch(error => { console.error('바코드 API 오류:', error); statusEl.textContent = '서버 통신 오류 (바코드)'; statusEl.className = 'scanner-status error'; showStartButtons(); });
             }
 
             // --- OCR 스캔 관련 ---
             async function startOcrScan() {
-                if (html5QrCode && html5QrCode.isScanning) await stopScan(); // 다른 스캔 중이면 중지
+                if (html5QrCode && html5QrCode.isScanning) await stopScan(); 
 
                 statusEl.textContent = "OCR 스캔 시작 중..."; statusEl.className = 'scanner-status loading';
                 showVideo();
                 
-                // OCR용으로 비디오 스트림만 시작 (스캔 콜백 없음)
                 html5QrCode = new Html5Qrcode("qr-reader");
                 try {
+                    // (*** 수정: qrCodeSuccessCallback 자리에 빈 함수 추가 ***)
                     await html5QrCode.start(
                         { facingMode: "environment" }, 
-                        { fps: 5 }, // OCR은 fps 낮춰도 됨
-                        null, // 바코드 성공 콜백 없음
+                        { fps: 5 }, 
+                        () => {}, // 바코드 성공 콜백 (아무것도 안 함)
                         (errorMessage) => { /* 오류 무시 */ }
                     );
                     statusEl.textContent = "카메라 켜짐 (OCR 스캔 준비 완료)"; statusEl.className = 'scanner-status';
                     showStopButton();
                     
-                    // Tesseract 워커 생성 (한 번만)
-                    tesseractWorker = await Tesseract.createWorker('kor+eng', 1, { // 1 = OEM_LSTM_ONLY
-                        // logger: m => console.log(m) // 진행률 로깅 (너무 많으면 주석 처리)
-                    });
+                    tesseractWorker = await Tesseract.createWorker('kor+eng', 1, { /* logger: m => console.log(m) */ });
                     
-                    // (*** 중요: 실시간 OCR 시작 ***)
-                    // 약 1.5초마다 비디오 프레임 -> OCR -> 결과 처리
                     ocrIntervalId = setInterval(performOcr, 1500); 
 
                 } catch (err) {
                     statusEl.textContent = `카메라 시작 불가: ${err}`; statusEl.className = 'scanner-status error';
-                    hideVideo();
-                    showStartButtons();
+                    hideVideo(); showStartButtons();
                 }
             }
             
-            // 현재 비디오 프레임으로 OCR 수행하는 함수
             async function performOcr() {
-                if (!tesseractWorker || !html5QrCode || !html5QrCode.isScanning) return; // 중지되었으면 실행 안 함
+                if (!tesseractWorker || !html5QrCode || !html5QrCode.isScanning) return; 
 
                 const video = document.querySelector('#qr-reader video');
                 if (!video) return;
@@ -233,26 +211,22 @@
                 statusEl.textContent = "OCR 인식 중..."; statusEl.className = 'scanner-status loading';
 
                 try {
-                    // 비디오 프레임을 canvas -> 이미지 데이터로 변환 (Tesseract 입력용)
                     const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                     const context = canvas.getContext('2d');
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const imageDataUrl = canvas.toDataURL('image/png');
 
-                    // OCR 실행
                     const { data: { text } } = await tesseractWorker.recognize(imageDataUrl);
                     
-                    // OCR 결과 처리 (서버 전송은 하지 않고 화면에만 표시 - 선택 사항)
-                    const cleanedText = text.trim().replace(/\s+/g, ' '); // 줄바꿈, 여러 공백 제거
+                    const cleanedText = text.trim().replace(/\s+/g, ' '); 
                     ocrResultEl.textContent = `인식된 텍스트: ${cleanedText || '(없음)'}`; 
                     
-                    // (선택) 특정 키워드(예: 품번 형식)가 감지되면 서버 검색
-                    if (cleanedText && /[A-Z0-9]{5,}-[A-Z0-9]{5,}/.test(cleanedText)) { // 예: ABCDE-12345 형식
-                       handleOcrSuccess(cleanedText); // 서버로 검색 요청
+                    // (선택) 특정 패턴 감지 시 서버 검색
+                    if (cleanedText && /[A-Z0-9]{5,}-[A-Z0-9]{5,}/.test(cleanedText)) { 
+                       handleOcrSuccess(cleanedText); 
                     } else {
-                       statusEl.textContent = "OCR 스캔 중... (텍스트 읽는 중)"; statusEl.className = 'scanner-status'; // OCR 계속 진행
+                       statusEl.textContent = "OCR 스캔 중... (텍스트 읽는 중)"; statusEl.className = 'scanner-status'; 
                     }
 
                 } catch (err) {
@@ -262,28 +236,18 @@
                 }
             }
 
-            // OCR 성공 후 서버 전송 (텍스트 검색)
             function handleOcrSuccess(ocrText) {
-                // (선택) OCR 결과에서 불필요한 부분 제거 후 검색할 수도 있음
                 const searchText = ocrText.trim(); 
-                
                 if (!searchText) { statusEl.textContent = "OCR 결과가 비어있습니다."; statusEl.className = 'scanner-status error'; return; }
-
                 statusEl.textContent = `OCR 결과 "${searchText}"로 서버 검색 중...`; statusEl.className = 'scanner-status loading';
-                
-                // OCR 스캔 중지 (검색 시작하면)
                 stopScan(); 
 
                 fetch("{{ url_for('text_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: searchText }) })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status === 'found_one') {
-                        statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`;
-                        window.location.href = `/product/${data.product_number}`;
-                    } else if (data.status === 'found_many') {
-                        statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`;
-                        window.location.href = `/?query=${encodeURIComponent(data.query)}`;
-                    } else { statusEl.textContent = `OCR 검색 오류: ${data.message}`; statusEl.className = 'scanner-status error'; showStartButtons(); }
+                    if (data.status === 'found_one') { statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; window.location.href = `/product/${data.product_number}`; } 
+                    else if (data.status === 'found_many') { statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; window.location.href = `/?query=${encodeURIComponent(data.query)}`; } 
+                    else { statusEl.textContent = `OCR 검색 오류: ${data.message}`; statusEl.className = 'scanner-status error'; showStartButtons(); }
                 })
                 .catch(error => { console.error('텍스트 검색 API 오류:', error); statusEl.textContent = '서버 통신 오류 (OCR)'; statusEl.className = 'scanner-status error'; showStartButtons(); });
             }
