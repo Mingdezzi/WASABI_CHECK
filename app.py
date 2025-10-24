@@ -9,11 +9,10 @@ from sqlalchemy import or_, func, text
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-# (*** 1. Google Cloud Vision 라이브러리만 남김 ***)
-from google.cloud import vision
-from google.oauth2 import service_account # 서비스 계정 키 사용
-
-# (*** 2. pytesseract, PIL, werkzeug.utils 관련 import 모두 삭제 ***)
+# 서버 OCR 라이브러리
+import pytesseract
+from PIL import Image
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -31,38 +30,25 @@ db = SQLAlchemy(app)
 
 IMAGE_URL_PREFIX = 'https://files.ebizway.co.kr/files/10249/Style/'
 
-# (*** 3. Google Cloud 인증 정보 경로 설정 ( vision_client 초기화 코드 ) ***)
-GCP_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-vision_client = None
-if GCP_CREDENTIALS_PATH and os.path.exists(GCP_CREDENTIALS_PATH):
-    try:
-        credentials = service_account.Credentials.from_service_account_file(GCP_CREDENTIALS_PATH)
-        vision_client = vision.ImageAnnotatorClient(credentials=credentials)
-        print("Google Cloud Vision Client initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing Google Cloud Vision Client: {e}")
-else:
-    print("GOOGLE_APPLICATION_CREDENTIALS path not found or invalid.")
-    local_key_path = 'gcp_credentials.json'
-    if os.path.exists(local_key_path):
-        try:
-            credentials = service_account.Credentials.from_service_account_file(local_key_path)
-            vision_client = vision.ImageAnnotatorClient(credentials=credentials)
-            print("Google Cloud Vision Client initialized locally for development.")
-        except Exception as e:
-            print(f"Error initializing local Google Cloud Vision Client: {e}")
-
 # --- DB 모델 정의 ---
 class Product(db.Model):
     __tablename__ = 'products'
-    product_number = db.Column(db.String, primary_key=True); product_name = db.Column(db.String, nullable=False); is_favorite = db.Column(db.Integer, default=0)
+    product_number = db.Column(db.String, primary_key=True)
+    product_name = db.Column(db.String, nullable=False)
+    is_favorite = db.Column(db.Integer, default=0)
     variants = db.relationship('Variant', backref='product', lazy=True, cascade="all, delete-orphan")
 
 class Variant(db.Model):
     __tablename__ = 'variants'
-    barcode = db.Column(db.String, primary_key=True); product_number = db.Column(db.String, db.ForeignKey('products.product_number'), nullable=False)
-    color = db.Column(db.String); size = db.Column(db.String); store_stock = db.Column(db.Integer, default=0); hq_stock = db.Column(db.Integer, default=0)
-    original_price = db.Column(db.Integer, default=0); sale_price = db.Column(db.Integer, default=0); discount_rate = db.Column(db.String)
+    barcode = db.Column(db.String, primary_key=True)
+    product_number = db.Column(db.String, db.ForeignKey('products.product_number'), nullable=False)
+    color = db.Column(db.String)
+    size = db.Column(db.String)
+    store_stock = db.Column(db.Integer, default=0)
+    hq_stock = db.Column(db.Integer, default=0)
+    original_price = db.Column(db.Integer, default=0)
+    sale_price = db.Column(db.Integer, default=0)
+    discount_rate = db.Column(db.String)
 
 # --- DB 초기화 함수 ---
 def init_db():
@@ -77,7 +63,8 @@ def import_excel():
         if file.filename == '': flash('파일 선택 안됨.', 'error'); return redirect(url_for('index'))
         if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
             try:
-                file_content = file.read(); df = pd.read_excel( io.BytesIo(file_content), sheet_name=0, dtype={'barcode': str, 'product_number': str}, keep_default_na=False )
+                file_content = file.read()
+                df = pd.read_excel( io.BytesIO(file_content), sheet_name=0, dtype={'barcode': str, 'product_number': str}, keep_default_na=False )
                 required_cols = [ 'product_number', 'product_name', 'color', 'barcode', 'size', 'store_stock', 'hq_stock', 'original_price', 'sale_price', 'discount_rate' ]
                 if not all(col in df.columns for col in required_cols): flash(f"엑셀 컬럼명 오류. 필수 10개 확인: {required_cols}", 'error'); return redirect(url_for('index'))
                 if 'is_favorite' not in df.columns: df['is_favorite'] = 0
@@ -104,12 +91,27 @@ def index():
 
 # 정렬 함수
 def get_sort_key(variant):
-    color = variant.color or ''; size_str = str(variant.size).upper().strip()
-    if size_str == '2XS': size_str = 'XXS'; elif size_str == '2XL': size_str = 'XXL'; elif size_str == '3XL': size_str = 'XXXL'
+    color = variant.color or ''
+    size_str = str(variant.size).upper().strip()
+
+    # 사이즈 동의어 처리
+    if size_str == '2XS':
+        size_str = 'XXS'
+    elif size_str == '2XL':
+        size_str = 'XXL'
+    elif size_str == '3XL':
+        size_str = 'XXXL'
+
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-    if size_str.isdigit(): sort_key = (1, int(size_str), '')
-    elif size_str in custom_order: sort_key = (2, custom_order.index(size_str), '')
-    else: sort_key = (3, 0, size_str)
+
+    # 정렬 키 생성
+    if size_str.isdigit():
+        sort_key = (1, int(size_str), '') # 숫자 우선
+    elif size_str in custom_order:
+        sort_key = (2, custom_order.index(size_str), '') # 커스텀 알파벳 순서
+    else:
+        sort_key = (3, 0, size_str) # 나머지 알파벳
+
     return (color, sort_key)
 
 @app.route('/product/<product_number>')
@@ -118,12 +120,16 @@ def product_detail(product_number):
     if product is None: flash("상품 없음.", 'error'); return redirect(url_for('index'))
     image_url = f"{IMAGE_URL_PREFIX}{product.product_number}.jpg"; variants_list = sorted(product.variants, key=get_sort_key); related_products = []
     if product.product_name:
-        search_words = product.product_name.split(' ');
+        search_words = product.product_name.split(' ')
         if search_words:
             search_term = search_words[-1]
             if len(search_term) > 1:
-                related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
+                related_products = Product.query.filter(
+                    Product.product_name.ilike(f'%{search_term}%'),
+                    Product.product_number != product_number
+                ).limit(5).all()
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
+
 
 # --- API 라우트 ---
 @app.route('/barcode_search', methods=['POST'])
@@ -136,61 +142,51 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
-# (*** Google Vision AI를 사용하는 /ocr_upload 함수 ***)
+# (*** OCR 업로드 API ***)
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if vision_client is None:
         return jsonify({'status': 'error', 'message': 'Google Cloud Vision 클라이언트 초기화 실패.'}), 500
-
     if 'ocr_image' not in request.files: return jsonify({'status': 'error', 'message': '이미지 파일 없음.'}), 400
     file = request.files['ocr_image']
     if file.filename == '': return jsonify({'status': 'error', 'message': '파일 이름 없음.'}), 400
     if file:
         try:
-            # 이미지 파일을 메모리에서 읽기
-            content = file.read()
-            image = vision.Image(content=content)
+            img = Image.open(file.stream)
+            custom_config = r'--oem 3 --psm 6 -l kor+eng'
+            ocr_text = pytesseract.image_to_string(img, config=custom_config)
+            print(f"Server OCR Raw Text: {ocr_text}")
 
-            # Google Cloud Vision API 호출 (텍스트 감지)
-            response = vision_client.text_detection(image=image)
-            texts = response.text_annotations
+            cleaned_text = ocr_text.upper().replace('\n', ' ').replace('\r', ' ')
+            cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
 
-            if response.error.message:
-                raise Exception(f'Vision API Error: {response.error.message}')
+            product_number_pattern = r'\bM[A-Z0-9-]{4,}\b'
+            matches = re.findall(product_number_pattern, cleaned_text)
+            print(f"Found Product Number Candidates: {matches}")
 
-            if texts:
-                # 전체 인식 텍스트 (보통 첫 번째 항목)
-                ocr_text = texts[0].description
-                print(f"Google Vision OCR Raw Text: {ocr_text}")
+            if matches:
+                search_text_raw = matches[0]
+                cleaned_search_text = search_text_raw.replace('-', '')
 
-                cleaned_text = ocr_text.upper().replace('\n', ' ').replace('\r', ' ')
-                cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+                if len(cleaned_search_text) < 5:
+                    return jsonify({'status': 'error', 'message': f'찾은 품번 패턴 "{search_text_raw}" 짧음.'}), 400
 
-                product_number_pattern = r'\bM[A-Z0-9-]{4,}\b'
-                matches = re.findall(product_number_pattern, cleaned_text)
-                print(f"Found Product Number Candidates: {matches}")
+                print(f"Searching DB with cleaned prefix: {cleaned_search_text}")
+                results = Product.query.filter(
+                    func.replace(Product.product_number, '-', '').startswith(cleaned_search_text)
+                ).all()
+                print(f"Found: {len(results)}")
 
-                if matches:
-                    search_text_raw = matches[0]
-                    cleaned_search_text = search_text_raw.replace('-', '')
-
-                    if len(cleaned_search_text) < 5:
-                        return jsonify({'status': 'error', 'message': f'찾은 품번 패턴 "{search_text_raw}" 짧음.'}), 400
-
-                    print(f"Searching DB with cleaned prefix: {cleaned_search_text}")
-                    results = Product.query.filter( func.replace(Product.product_number, '-', '').startswith(cleaned_search_text) ).all()
-                    print(f"Found: {len(results)}")
-
-                    if len(results) == 1: return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
-                    elif len(results) > 1: return jsonify({'status': 'found_many', 'query': search_text_raw})
-                    else: return jsonify({'status': 'not_found', 'message': f'"{cleaned_search_text}"(으)로 시작 상품 없음.'}), 404
+                if len(results) == 1:
+                    return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
+                elif len(results) > 1:
+                    return jsonify({'status': 'found_many', 'query': search_text_raw})
                 else:
-                    return jsonify({'status': 'error', 'message': 'OCR 결과에서 품번 패턴(M...) 못 찾음.'}), 400
+                    return jsonify({'status': 'not_found', 'message': f'"{cleaned_search_text}"(으)로 시작하는 상품 없음.'}), 404
             else:
-                 return jsonify({'status': 'error', 'message': 'Google Vision API가 텍스트를 감지하지 못했습니다.'}), 400
-
+                return jsonify({'status': 'error', 'message': 'OCR 결과에서 품번 패턴(M...) 못 찾음.'}), 400
         except Exception as e:
-            print(f"Server OCR Error (Google Vision): {e}")
+            print(f"Server OCR Error: {e}")
             return jsonify({'status': 'error', 'message': f'서버 OCR 오류: {e}'}), 500
 
     return jsonify({'status': 'error', 'message': '파일 처리 중 알 수 없는 오류.'}), 500
