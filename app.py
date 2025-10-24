@@ -90,12 +90,12 @@ def index():
     else: showing_favorites = True; products = Product.query.filter_by(is_favorite=1).order_by(Product.product_name).all()
     return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
 
-# (*** 정리된 get_sort_key 함수 ***)
+# 정렬 함수
 def get_sort_key(variant):
     color = variant.color or ''
     size_str = str(variant.size).upper().strip()
 
-    # 사이즈 동의어 처리 (중복 제거)
+    # 사이즈 동의어 처리
     if size_str == '2XS':
         size_str = 'XXS'
     elif size_str == '2XL':
@@ -105,7 +105,7 @@ def get_sort_key(variant):
 
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
 
-    # 정렬 키 생성 (중복 제거)
+    # 정렬 키 생성
     if size_str.isdigit():
         sort_key = (1, int(size_str), '') # 숫자 우선
     elif size_str in custom_order:
@@ -113,14 +113,14 @@ def get_sort_key(variant):
     else:
         sort_key = (3, 0, size_str) # 나머지 알파벳
 
-    return (color, sort_key)
+    return (color, sort_key) # 최종 키: (컬러, (사이즈 종류, 사이즈 값, 원본 문자열))
 
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
     if product is None: flash("상품 없음.", 'error'); return redirect(url_for('index'))
     image_url = f"{IMAGE_URL_PREFIX}{product.product_number}.jpg"; variants_list = sorted(product.variants, key=get_sort_key); related_products = []
-    # 연관 상품 로직 (중복 제거)
+    # 연관 상품 로직
     if product.product_name:
         search_words = product.product_name.split(' ')
         if search_words:
@@ -144,7 +144,7 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
-# (*** 정리된 /ocr_upload 함수 ***)
+# 서버 OCR API
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if 'ocr_image' not in request.files: return jsonify({'status': 'error', 'message': '이미지 파일 없음.'}), 400
@@ -155,14 +155,14 @@ def ocr_upload():
             img = Image.open(file.stream)
             custom_config = r'--oem 3 --psm 6 -l kor+eng'
             ocr_text = pytesseract.image_to_string(img, config=custom_config)
-            print(f"Server OCR Raw Text: {ocr_text}") # 디버깅용 로그
+            print(f"Server OCR Raw Text: {ocr_text}") # 디버깅용
 
             cleaned_text = ocr_text.upper().replace('\n', ' ').replace('\r', ' ')
             cleaned_text = re.sub(r'\s+', ' ', cleaned_text) # 여러 공백 -> 하나로
 
             product_number_pattern = r'\bM[A-Z0-9-]{4,}\b'
             matches = re.findall(product_number_pattern, cleaned_text)
-            print(f"Found Product Number Candidates: {matches}") # 디버깅용 로그
+            print(f"Found Product Number Candidates: {matches}") # 디버깅용
 
             if matches:
                 search_text = matches[0] # 첫 번째 후보 사용
@@ -178,10 +178,9 @@ def ocr_upload():
                 else:
                     return jsonify({'status': 'not_found', 'message': f'"{search_text}" 상품 없음.'}), 404
             else:
-                # 품번 패턴 못 찾음 (중복 제거)
                 return jsonify({'status': 'error', 'message': 'OCR 결과에서 품번 패턴(M...) 못 찾음.'}), 400
         except Exception as e:
-            print(f"Server OCR Error: {e}") # 디버깅용 로그 (중복 제거)
+            print(f"Server OCR Error: {e}") # 디버깅용
             return jsonify({'status': 'error', 'message': f'서버 OCR 오류: {e}'}), 500
 
     return jsonify({'status': 'error', 'message': '파일 처리 중 알 수 없는 오류.'}), 500
