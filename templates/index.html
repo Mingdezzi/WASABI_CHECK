@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WASABI_CHECK - 상품 리스트</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-
     <style>
         /* (이전 스타일과 동일) */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
@@ -32,7 +30,7 @@
         .import-form button { background-color: #dc3545; color: white; border: none; padding: 12px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
 
         /* 스캔 버튼 스타일 */
-        #qr-reader { width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; } /* 실시간용 */
+        #qr-reader { width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
         #scanner-controls { display: flex; gap: 10px; flex-wrap: wrap; }
         #scanner-controls button { flex-grow: 1; background-color: #2d8b57; color: white; border: none; padding: 12px; cursor: pointer; border-radius: 6px; font-size: 1em; font-weight: 500; min-width: 150px; }
         #scanner-controls button#stop-scan-btn { background-color: #dc3545; }
@@ -41,7 +39,7 @@
         #scanner-status.success { background-color: #d4edda; color: #155724; }
         #scanner-status.error { background-color: #f8d7da; color: #721c24; }
         #scanner-status.loading { background-color: #fff3cd; color: #856404; }
-        #ocr-result-display { font-style: italic; color: #555; margin-top: 5px; font-size: 0.9em; word-break: break-all;}
+        /* OCR 결과 표시 삭제 */
     </style>
 </head>
 <body>
@@ -65,7 +63,6 @@
                 <button id="stop-scan-btn" style="display: none;">스캔 중지</button>
             </div>
             <div id="scanner-status">원하는 스캔 버튼을 누르세요.</div>
-            <div id="ocr-result-display"></div>
             <input type="file" id="ocr-file-input" accept="image/*" capture style="display: none;">
         </div>
 
@@ -105,13 +102,10 @@
             const photoOcrBtn = document.getElementById('start-photo-ocr-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
             const statusEl = document.getElementById('scanner-status');
-            const ocrResultDisplayEl = document.getElementById('ocr-result-display');
             const videoEl = document.getElementById('qr-reader');
             const ocrFileInput = document.getElementById('ocr-file-input');
 
             let html5QrCode = null;
-            let photoQrCode = null;
-            let tesseractWorker = null;
             let isRealtimeScanning = false;
 
             // --- 공통 함수 ---
@@ -120,19 +114,21 @@
             function showStopButton() { stopBtn.style.display = 'inline-block'; realtimeBarcodeBtn.style.display = 'none'; photoOcrBtn.style.display = 'none'; }
             function showStartButtons() { stopBtn.style.display = 'none'; realtimeBarcodeBtn.style.display = 'inline-block'; photoOcrBtn.style.display = 'inline-block'; isRealtimeScanning = false; }
 
-            async function stopScan() { /* (이전과 동일) */
-                statusEl.textContent = "스캔 중지 중..."; if (tesseractWorker) { await tesseractWorker.terminate(); tesseractWorker = null; console.log("Tesseract worker terminated."); }
+            async function stopScan() {
+                statusEl.textContent = "스캔 중지 중...";
                 if (isRealtimeScanning && html5QrCode && html5QrCode.isScanning) { try { await html5QrCode.stop(); console.log("Realtime Barcode scanner stopped."); } catch (err) { console.error("Realtime Barcode scanner stop failed", err); } html5QrCode = null; }
-                isRealtimeScanning = false; hideVideo(); showStartButtons(); statusEl.textContent = "스캔이 중지되었습니다."; statusEl.className = 'scanner-status'; ocrResultDisplayEl.textContent = '';
+                isRealtimeScanning = false; hideVideo(); showStartButtons(); statusEl.textContent = "스캔이 중지되었습니다."; statusEl.className = 'scanner-status';
             }
 
             // --- 1. 실시간 바코드 스캔 ---
             async function startRealtimeBarcodeScan() { /* (이전과 동일) */
                 if (isRealtimeScanning) return; await stopScan();
                 statusEl.textContent = "실시간 바코드 스캔 시작 중..."; statusEl.className = 'scanner-status loading'; showVideo(); isRealtimeScanning = true;
-                html5QrCode = new Html5Qrcode("qr-reader"); const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128 ];
-                try { await html5QrCode.start( { facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 100 }, formatsToSupport: formatsToSupport }, handleBarcodeSuccess, (errorMessage) => {} ); statusEl.textContent = "카메라 켜짐 (실시간 바코드 스캔 중...)"; statusEl.className = 'scanner-status'; showStopButton(); }
-                catch (err) { statusEl.textContent = `카메라 시작 불가: ${err}`; statusEl.className = 'scanner-status error'; hideVideo(); showStartButtons(); isRealtimeScanning = false; }
+                html5QrCode = new Html5QrCode("qr-reader"); const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128 ];
+                try {
+                    await html5QrCode.start( { facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 100 }, formatsToSupport: formatsToSupport }, handleBarcodeSuccess, (errorMessage) => {} );
+                    statusEl.textContent = "카메라 켜짐 (실시간 바코드 스캔 중...)"; statusEl.className = 'scanner-status'; showStopButton();
+                } catch (err) { statusEl.textContent = `카메라 시작 불가: ${err}`; statusEl.className = 'scanner-status error'; hideVideo(); showStartButtons(); isRealtimeScanning = false; }
             }
 
             function handleBarcodeSuccess(decodedText) { /* (이전과 동일) */
@@ -143,66 +139,56 @@
                 .catch(error => { console.error('바코드 API 오류:', error); statusEl.textContent = '서버 통신 오류 (바코드)'; statusEl.className = 'scanner-status error'; showStartButtons(); });
             }
 
-            // --- 2. 사진 OCR 스캔 ---
-            function startPhotoOcrScan() { /* (이전과 동일) */
-                if (isRealtimeScanning) { stopScan().then(() => ocrFileInput.click()); }
-                else { ocrFileInput.click(); }
+            // --- 2. 사진 OCR 스캔 (서버 호출) ---
+            function startPhotoOcrScan() {
+                 if (isRealtimeScanning) { stopScan().then(() => ocrFileInput.click()); }
+                 else { ocrFileInput.click(); }
             }
 
-            ocrFileInput.addEventListener('change', async (e) => { /* (이전과 동일, 에러 처리 살짝 수정) */
+            ocrFileInput.addEventListener('change', async (e) => {
                 if (e.target.files.length == 0) { statusEl.textContent = "사진 선택 취소됨."; statusEl.className = 'scanner-status'; return; }
-                statusEl.textContent = "사진 OCR 분석 중..."; statusEl.className = 'scanner-status loading'; ocrResultDisplayEl.textContent = '';
+
+                statusEl.textContent = "사진 업로드 및 서버 OCR 처리 중..."; statusEl.className = 'scanner-status loading';
                 const imageFile = e.target.files[0];
+
+                // FormData 객체 생성
+                const formData = new FormData();
+                formData.append('ocr_image', imageFile); // 'ocr_image'는 app.py의 request.files 키와 일치
+
                 try {
-                    tesseractWorker = await Tesseract.createWorker('kor+eng', 1, { logger: m => console.log(m) });
-                    const { data: { text } } = await tesseractWorker.recognize(imageFile);
-                    ocrResultDisplayEl.textContent = `OCR 원본: ${text}`;
-                    handleOcrResult(text); // 품번 찾아서 검색 시도
-                } catch (ocrErr) { statusEl.textContent = `OCR 실패: ${ocrErr}`; statusEl.className = 'scanner-status error'; }
-                finally {
-                    if (tesseractWorker) { await tesseractWorker.terminate(); tesseractWorker = null; } // 워커 종료
+                    // 서버 /ocr_upload 로 이미지 파일 전송
+                    const response = await fetch("{{ url_for('ocr_upload') }}", {
+                        method: 'POST',
+                        body: formData // FormData 전송 (Content-Type 설정 불필요)
+                    });
+
+                    const data = await response.json(); // 서버 응답 (JSON) 받기
+
+                    // 서버 응답 처리
+                    if (response.ok) { // HTTP 상태 코드가 2xx 인 경우
+                        if (data.status === 'found_one') {
+                            statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`;
+                            window.location.href = `/product/${data.product_number}`;
+                        } else if (data.status === 'found_many') {
+                            statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`;
+                            window.location.href = `/?query=${encodeURIComponent(data.query)}`;
+                        } else { // 'not_found' 또는 'error'
+                            statusEl.textContent = `서버 OCR 오류: ${data.message}`;
+                            statusEl.className = 'scanner-status error';
+                        }
+                    } else { // HTTP 상태 코드가 4xx, 5xx 등 오류인 경우
+                         statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`;
+                         statusEl.className = 'scanner-status error';
+                    }
+
+                } catch (error) {
+                    console.error('OCR 업로드/처리 오류:', error);
+                    statusEl.textContent = '서버 통신 중 오류 발생 (OCR)';
+                    statusEl.className = 'scanner-status error';
+                } finally {
                     ocrFileInput.value = null; // 파일 입력 초기화
                 }
             });
-
-            // (*** OCR 결과 처리 함수 수정 ***)
-            function handleOcrResult(ocrText) {
-                if (!ocrText) { statusEl.textContent = "OCR 결과가 비어있습니다."; statusEl.className = 'scanner-status error'; return; }
-
-                console.log("Original OCR Text:", ocrText);
-
-                // 1. **품번 패턴 정의:** M + (알파벳/숫자 4개 이상) + [선택적 하이픈 또는 공백] + (알파벳/숫자 3개 이상)
-                //    OCR 오류로 하이픈 대신 공백이 들어갈 수 있음을 고려
-                const productNumberPattern = /M[A-Z0-9]{4,}[- ]?[A-Z0-9]{3,}/gi; // 대소문자 무시(i), 여러개 찾기(g)
-
-                // 2. OCR 텍스트에서 패턴과 일치하는 모든 후보 찾기
-                const matches = ocrText.match(productNumberPattern);
-                console.log("Potential Matches:", matches);
-
-                if (matches && matches.length > 0) {
-                    // 3. 찾은 후보 중 가장 그럴듯한 것 선택 (여기서는 첫 번째 것 사용)
-                    //    후보에서 공백 제거하고 대문자화
-                    const potentialPN = matches[0].toUpperCase().replace(/ /g, '');
-                    console.log(`품번 후보 선택: ${potentialPN}`);
-                    statusEl.textContent = `OCR 결과 "${potentialPN}"(으)로 서버 검색 중...`; statusEl.className = 'scanner-status loading';
-
-                    // 4. 서버 검색 요청 (/text_search API 사용)
-                    fetch("{{ url_for('text_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: potentialPN }) })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'found_one') { statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; window.location.href = `/product/${data.product_number}`; }
-                        else if (data.status === 'found_many') { statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; window.location.href = `/?query=${encodeURIComponent(data.query)}`; }
-                        else { statusEl.textContent = `OCR 검색 오류: "${potentialPN}" 상품 없음. (${data.message})`; statusEl.className = 'scanner-status error'; }
-                    })
-                    .catch(error => { console.error('텍스트 검색 API 오류:', error); statusEl.textContent = '서버 통신 오류 (OCR)'; statusEl.className = 'scanner-status error'; });
-
-                } else {
-                    // 품번 패턴을 못 찾음
-                    statusEl.textContent = "OCR 결과에서 품번 패턴(M...)을 찾지 못했습니다.";
-                    statusEl.className = 'scanner-status error';
-                    console.log("No product number pattern found in OCR text.");
-                }
-            }
 
             // --- 버튼 이벤트 리스너 ---
             realtimeBarcodeBtn.addEventListener('click', startRealtimeBarcodeScan);
