@@ -71,7 +71,6 @@ class Variant(db.Model):
     hq_stock = db.Column(Integer, default=0)
     original_price = db.Column(Integer, default=0)
     sale_price = db.Column(Integer, default=0)
-    # discount_rate 삭제됨
 
 # --- DB 초기화 함수 ---
 def init_db():
@@ -95,7 +94,7 @@ def import_excel():
                 if 'is_favorite' not in excel_cols: df['is_favorite'] = 0
                 else: df['is_favorite'] = pd.to_numeric(df['is_favorite'], errors='coerce').fillna(0).astype(int)
 
-                db.session.query(Variant).delete(); db.session.query(Product).delete(); db.session.commit() # 순서 중요
+                db.session.query(Variant).delete(); db.session.query(Product).delete(); db.session.commit()
 
                 product_cols = ['product_number', 'product_name', 'release_year', 'item_category', 'is_favorite']
                 actual_product_cols = [col for col in product_cols if col in df.columns]
@@ -116,7 +115,6 @@ def import_excel():
     return redirect(url_for('index'))
 
 # --- 웹페이지 라우트 ---
-# (*** 수정된 index 함수 ***)
 @app.route('/')
 def index():
     query = request.args.get('query', ''); showing_favorites = False
@@ -125,21 +123,34 @@ def index():
         products = Product.query.filter( or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term)) ).order_by(Product.product_name).all()
     else:
         showing_favorites = True
-        # (*** 2. 수정: item_category (품목) -> product_name (품명) 순으로 정렬 ***)
         products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.item_category, Product.product_name).all()
     
-    # (*** 1. 수정: IMAGE_URL_PREFIX 를 템플릿에 전달 ***)
     return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites, IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
 
-# 정렬 함수
+# 정렬 함수 (*** SyntaxError 수정 완료 ***)
 def get_sort_key(variant):
-    color = variant.color or ''; size_str = str(variant.size).upper().strip()
-    if size_str == '2XS': size_str = 'XXS'; elif size_str == '2XL': size_str = 'XXL'; elif size_str == '3XL': size_str = 'XXXL'
+    color = variant.color or ''
+    size_str = str(variant.size).upper().strip()
+
+    # 사이즈 동의어 처리 (여러 줄로 수정됨)
+    if size_str == '2XS':
+        size_str = 'XXS'
+    elif size_str == '2XL':
+        size_str = 'XXL'
+    elif size_str == '3XL':
+        size_str = 'XXXL'
+
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-    if size_str.isdigit(): sort_key = (1, int(size_str), '')
-    elif size_str in custom_order: sort_key = (2, custom_order.index(size_str), '')
-    else: sort_key = (3, 0, size_str)
-    return (color, sort_key)
+
+    # 정렬 키 생성
+    if size_str.isdigit():
+        sort_key = (1, int(size_str), '') # 숫자 우선
+    elif size_str in custom_order:
+        sort_key = (2, custom_order.index(size_str), '') # 커스텀 알파벳 순서
+    else:
+        sort_key = (3, 0, size_str) # 나머지 알파벳
+
+    return (color, sort_key) # 최종 키: (컬러, (사이즈 종류, 사이즈 값, 원본 문자열))
 
 @app.route('/product/<product_number>')
 def product_detail(product_number):
@@ -153,6 +164,7 @@ def product_detail(product_number):
             if len(search_term) > 1:
                 related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
+
 
 # --- API 라우트 ---
 @app.route('/barcode_search', methods=['POST'])
