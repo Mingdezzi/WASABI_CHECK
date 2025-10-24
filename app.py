@@ -30,6 +30,15 @@ db = SQLAlchemy(app)
 
 IMAGE_URL_PREFIX = 'https://files.ebizway.co.kr/files/10249/Style/'
 
+# (*** 1. 신규: 이미지 URL Prefix를 모든 템플릿에 전달 ***)
+@app.context_processor
+def inject_image_url_prefix():
+    """
+    모든 Jinja2 템플릿에서 'IMAGE_URL_PREFIX' 변수를 사용할 수 있게 함
+    (예: index.html의 즐겨찾기 목록 이미지 표시용)
+    """
+    return dict(IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
+
 # Google Cloud 인증 정보 경로 설정
 GCP_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 vision_client = None
@@ -125,44 +134,38 @@ def index():
         showing_favorites = True
         products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.item_category, Product.product_name).all()
     
-    return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites, IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
+    # (*** 2. 수정: IMAGE_URL_PREFIX 전달 코드 삭제 (컨텍스트 프로세서가 대신함) ***)
+    return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
 
-# 정렬 함수 (*** SyntaxError 수정 완료 ***)
+# 정렬 함수
 def get_sort_key(variant):
-    color = variant.color or ''
-    size_str = str(variant.size).upper().strip()
-
-    # 사이즈 동의어 처리 (여러 줄로 수정됨)
-    if size_str == '2XS':
-        size_str = 'XXS'
-    elif size_str == '2XL':
-        size_str = 'XXL'
-    elif size_str == '3XL':
-        size_str = 'XXXL'
-
+    color = variant.color or ''; size_str = str(variant.size).upper().strip()
+    if size_str == '2XS': size_str = 'XXS'
+    elif size_str == '2XL': size_str = 'XXL'
+    elif size_str == '3XL': size_str = 'XXXL'
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-
-    # 정렬 키 생성
-    if size_str.isdigit():
-        sort_key = (1, int(size_str), '') # 숫자 우선
-    elif size_str in custom_order:
-        sort_key = (2, custom_order.index(size_str), '') # 커스텀 알파벳 순서
-    else:
-        sort_key = (3, 0, size_str) # 나머지 알파벳
-
-    return (color, sort_key) # 최종 키: (컬러, (사이즈 종류, 사이즈 값, 원본 문자열))
+    if size_str.isdigit(): sort_key = (1, int(size_str), '')
+    elif size_str in custom_order: sort_key = (2, custom_order.index(size_str), '')
+    else: sort_key = (3, 0, size_str)
+    return (color, sort_key)
 
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
     if product is None: flash("상품 없음.", 'error'); return redirect(url_for('index'))
-    image_url = f"{IMAGE_URL_PREFIX}{product.product_number}.jpg"; variants_list = sorted(product.variants, key=get_sort_key); related_products = []
+    
+    # (*** 이미지 URL 생성 로직 수정 ***)
+    image_product_number = product.product_number.split(' ')[0]
+    image_url = f"{IMAGE_URL_PREFIX}{image_product_number}.jpg"
+    
+    variants_list = sorted(product.variants, key=get_sort_key); related_products = []
     if product.product_name:
         search_words = product.product_name.split(' ');
         if search_words:
             search_term = search_words[-1]
             if len(search_term) > 1:
                 related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
+    
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
 
 
@@ -177,7 +180,6 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
-# Google Vision AI를 사용하는 /ocr_upload 함수
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if vision_client is None: return jsonify({'status': 'error', 'message': 'Google Cloud Vision 클라이언트 초기화 실패.'}), 500
