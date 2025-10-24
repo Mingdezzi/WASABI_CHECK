@@ -116,19 +116,46 @@
 
             async function stopScan() {
                 statusEl.textContent = "스캔 중지 중...";
+                // OCR 워커 종료 생략
                 if (isRealtimeScanning && html5QrCode && html5QrCode.isScanning) { try { await html5QrCode.stop(); console.log("Realtime Barcode scanner stopped."); } catch (err) { console.error("Realtime Barcode scanner stop failed", err); } html5QrCode = null; }
                 isRealtimeScanning = false; hideVideo(); showStartButtons(); statusEl.textContent = "스캔이 중지되었습니다."; statusEl.className = 'scanner-status';
             }
 
             // --- 1. 실시간 바코드 스캔 ---
-            async function startRealtimeBarcodeScan() { /* (이전과 동일) */
-                if (isRealtimeScanning) return; await stopScan();
-                statusEl.textContent = "실시간 바코드 스캔 시작 중..."; statusEl.className = 'scanner-status loading'; showVideo(); isRealtimeScanning = true;
-                html5QrCode = new Html5QrCode("qr-reader"); const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128 ];
+            async function startRealtimeBarcodeScan() {
+                if (isRealtimeScanning) return;
+                await stopScan();
+
+                statusEl.textContent = "실시간 바코드 스캔 시작 중..."; statusEl.className = 'scanner-status loading';
+                showVideo();
+                isRealtimeScanning = true;
+
+                // (*** 수정: Html5Qrcode 객체 생성 시점 변경 ***)
+                // 버튼 클릭 시점에 생성하여 라이브러리 로딩 지연 대응
                 try {
-                    await html5QrCode.start( { facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 100 }, formatsToSupport: formatsToSupport }, handleBarcodeSuccess, (errorMessage) => {} );
-                    statusEl.textContent = "카메라 켜짐 (실시간 바코드 스캔 중...)"; statusEl.className = 'scanner-status'; showStopButton();
-                } catch (err) { statusEl.textContent = `카메라 시작 불가: ${err}`; statusEl.className = 'scanner-status error'; hideVideo(); showStartButtons(); isRealtimeScanning = false; }
+                    // Html5Qrcode 객체 생성
+                    html5QrCode = new Html5Qrcode("qr-reader");
+                    const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128 ];
+
+                    // start 메서드 호출
+                    await html5QrCode.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: { width: 250, height: 100 }, formatsToSupport: formatsToSupport },
+                        handleBarcodeSuccess,
+                        (errorMessage) => { /* 오류 무시 */ }
+                    );
+                    statusEl.textContent = "카메라 켜짐 (실시간 바코드 스캔 중...)"; statusEl.className = 'scanner-status';
+                    showStopButton();
+                } catch (err) {
+                    // Html5Qrcode 객체 생성 실패 또는 start 실패
+                    statusEl.textContent = `카메라/스캐너 시작 불가: ${err}`; statusEl.className = 'scanner-status error';
+                    hideVideo(); showStartButtons(); isRealtimeScanning = false;
+                    // 에러 원인 추적을 위해 콘솔에 로그 추가
+                    console.error("Error starting realtime barcode scan:", err);
+                    if (typeof Html5Qrcode === 'undefined') {
+                        console.error("Html5Qrcode library might not be loaded correctly.");
+                    }
+                }
             }
 
             function handleBarcodeSuccess(decodedText) { /* (이전과 동일) */
@@ -140,54 +167,26 @@
             }
 
             // --- 2. 사진 OCR 스캔 (서버 호출) ---
-            function startPhotoOcrScan() {
+            function startPhotoOcrScan() { /* (이전과 동일) */
                  if (isRealtimeScanning) { stopScan().then(() => ocrFileInput.click()); }
                  else { ocrFileInput.click(); }
             }
 
-            ocrFileInput.addEventListener('change', async (e) => {
+            ocrFileInput.addEventListener('change', async (e) => { /* (이전과 동일) */
                 if (e.target.files.length == 0) { statusEl.textContent = "사진 선택 취소됨."; statusEl.className = 'scanner-status'; return; }
-
                 statusEl.textContent = "사진 업로드 및 서버 OCR 처리 중..."; statusEl.className = 'scanner-status loading';
                 const imageFile = e.target.files[0];
-
-                // FormData 객체 생성
-                const formData = new FormData();
-                formData.append('ocr_image', imageFile); // 'ocr_image'는 app.py의 request.files 키와 일치
-
+                const formData = new FormData(); formData.append('ocr_image', imageFile);
                 try {
-                    // 서버 /ocr_upload 로 이미지 파일 전송
-                    const response = await fetch("{{ url_for('ocr_upload') }}", {
-                        method: 'POST',
-                        body: formData // FormData 전송 (Content-Type 설정 불필요)
-                    });
-
-                    const data = await response.json(); // 서버 응답 (JSON) 받기
-
-                    // 서버 응답 처리
-                    if (response.ok) { // HTTP 상태 코드가 2xx 인 경우
-                        if (data.status === 'found_one') {
-                            statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`;
-                            window.location.href = `/product/${data.product_number}`;
-                        } else if (data.status === 'found_many') {
-                            statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`;
-                            window.location.href = `/?query=${encodeURIComponent(data.query)}`;
-                        } else { // 'not_found' 또는 'error'
-                            statusEl.textContent = `서버 OCR 오류: ${data.message}`;
-                            statusEl.className = 'scanner-status error';
-                        }
-                    } else { // HTTP 상태 코드가 4xx, 5xx 등 오류인 경우
-                         statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`;
-                         statusEl.className = 'scanner-status error';
-                    }
-
-                } catch (error) {
-                    console.error('OCR 업로드/처리 오류:', error);
-                    statusEl.textContent = '서버 통신 중 오류 발생 (OCR)';
-                    statusEl.className = 'scanner-status error';
-                } finally {
-                    ocrFileInput.value = null; // 파일 입력 초기화
-                }
+                    const response = await fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.status === 'found_one') { statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; window.location.href = `/product/${data.product_number}`; }
+                        else if (data.status === 'found_many') { statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; window.location.href = `/?query=${encodeURIComponent(data.query)}`; }
+                        else { statusEl.textContent = `서버 OCR 오류: ${data.message}`; statusEl.className = 'scanner-status error'; }
+                    } else { statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`; statusEl.className = 'scanner-status error'; }
+                } catch (error) { console.error('OCR 업로드/처리 오류:', error); statusEl.textContent = '서버 통신 중 오류 발생 (OCR)'; statusEl.className = 'scanner-status error'; }
+                finally { ocrFileInput.value = null; }
             });
 
             // --- 버튼 이벤트 리스너 ---
