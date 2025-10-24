@@ -6,3 +6,5 @@ SQLAlchemy
 psycopg2-binary
 gunicorn
 APScheduler
+pytesseract
+Pillow
