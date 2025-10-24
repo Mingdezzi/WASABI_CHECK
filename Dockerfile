@@ -25,8 +25,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 5. 앱 코드 전체 복사
 COPY . .
 
-# 6. 환경 변수 설정 (Gunicorn 설정)
-ENV GUNICORN_CMD_ARGS="--workers 1 --bind 0.0.0.0:$PORT app:app"
+# 6. 환경 변수 설정 (Gunicorn 설정) - (*** 이 줄 삭제 ***)
+# ENV GUNICORN_CMD_ARGS="--workers 1 --bind 0.0.0.0:$PORT app:app"
 
-# 7. 앱 실행 명령어
-CMD flask init-db && gunicorn $GUNICORN_CMD_ARGS
+# 7. 앱 실행 명령어 - (*** 수정된 부분 ***)
+#    Gunicorn 실행 시 --bind 옵션에 $PORT 직접 사용
+CMD flask init-db && gunicorn --workers 1 --bind 0.0.0.0:$PORT app:app
