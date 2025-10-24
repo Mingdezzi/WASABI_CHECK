@@ -10,7 +10,7 @@ RUN apt-get update && \
     tesseract-ocr \
     tesseract-ocr-kor \
     tesseract-ocr-eng \
-    tesseract-ocr-dev \
+    libtesseract-dev \
     # 필요한 빌드 도구
     gcc \
     libpq-dev && \
