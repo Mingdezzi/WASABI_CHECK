@@ -9,11 +9,9 @@ from sqlalchemy import or_, func, text
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-# (*** 1. Google Cloud Vision 라이브러리만 남김 ***)
+# Google Cloud Vision 라이브러리
 from google.cloud import vision
 from google.oauth2 import service_account # 서비스 계정 키 사용
-
-# (*** 2. pytesseract, PIL, werkzeug.utils 관련 import 모두 삭제 ***)
 
 app = Flask(__name__)
 
@@ -31,7 +29,7 @@ db = SQLAlchemy(app)
 
 IMAGE_URL_PREFIX = 'https://files.ebizway.co.kr/files/10249/Style/'
 
-# (*** 3. Google Cloud 인증 정보 경로 설정 ( vision_client 초기화 코드 ) ***)
+# Google Cloud 인증 정보 경로 설정 ( vision_client 초기화 코드 )
 GCP_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 vision_client = None
 if GCP_CREDENTIALS_PATH and os.path.exists(GCP_CREDENTIALS_PATH):
@@ -43,7 +41,7 @@ if GCP_CREDENTIALS_PATH and os.path.exists(GCP_CREDENTIALS_PATH):
         print(f"Error initializing Google Cloud Vision Client: {e}")
 else:
     print("GOOGLE_APPLICATION_CREDENTIALS path not found or invalid.")
-    local_key_path = 'gcp_credentials.json'
+    local_key_path = 'gcp_credentials.json' # 로컬 테스트용 키 파일 이름
     if os.path.exists(local_key_path):
         try:
             credentials = service_account.Credentials.from_service_account_file(local_key_path)
@@ -55,14 +53,22 @@ else:
 # --- DB 모델 정의 ---
 class Product(db.Model):
     __tablename__ = 'products'
-    product_number = db.Column(db.String, primary_key=True); product_name = db.Column(db.String, nullable=False); is_favorite = db.Column(db.Integer, default=0)
+    product_number = db.Column(db.String, primary_key=True)
+    product_name = db.Column(db.String, nullable=False)
+    is_favorite = db.Column(db.Integer, default=0)
     variants = db.relationship('Variant', backref='product', lazy=True, cascade="all, delete-orphan")
 
 class Variant(db.Model):
     __tablename__ = 'variants'
-    barcode = db.Column(db.String, primary_key=True); product_number = db.Column(db.String, db.ForeignKey('products.product_number'), nullable=False)
-    color = db.Column(db.String); size = db.Column(db.String); store_stock = db.Column(db.Integer, default=0); hq_stock = db.Column(db.Integer, default=0)
-    original_price = db.Column(db.Integer, default=0); sale_price = db.Column(db.Integer, default=0); discount_rate = db.Column(db.String)
+    barcode = db.Column(db.String, primary_key=True)
+    product_number = db.Column(db.String, db.ForeignKey('products.product_number'), nullable=False)
+    color = db.Column(db.String)
+    size = db.Column(db.String)
+    store_stock = db.Column(db.Integer, default=0)
+    hq_stock = db.Column(db.Integer, default=0)
+    original_price = db.Column(db.Integer, default=0)
+    sale_price = db.Column(db.Integer, default=0)
+    discount_rate = db.Column(db.String)
 
 # --- DB 초기화 함수 ---
 def init_db():
@@ -102,15 +108,30 @@ def index():
     else: showing_favorites = True; products = Product.query.filter_by(is_favorite=1).order_by(Product.product_name).all()
     return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
 
-# 정렬 함수
+# 정렬 함수 (SyntaxError 수정 완료)
 def get_sort_key(variant):
-    color = variant.color or ''; size_str = str(variant.size).upper().strip()
-    if size_str == '2XS': size_str = 'XXS'; elif size_str == '2XL': size_str = 'XXL'; elif size_str == '3XL': size_str = 'XXXL'
+    color = variant.color or ''
+    size_str = str(variant.size).upper().strip()
+
+    # 사이즈 동의어 처리
+    if size_str == '2XS':
+        size_str = 'XXS'
+    elif size_str == '2XL':
+        size_str = 'XXL'
+    elif size_str == '3XL':
+        size_str = 'XXXL'
+
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-    if size_str.isdigit(): sort_key = (1, int(size_str), '')
-    elif size_str in custom_order: sort_key = (2, custom_order.index(size_str), '')
-    else: sort_key = (3, 0, size_str)
-    return (color, sort_key)
+
+    # 정렬 키 생성
+    if size_str.isdigit():
+        sort_key = (1, int(size_str), '') # 숫자 우선
+    elif size_str in custom_order:
+        sort_key = (2, custom_order.index(size_str), '') # 커스텀 알파벳 순서
+    else:
+        sort_key = (3, 0, size_str) # 나머지 알파벳
+
+    return (color, sort_key) # 최종 키: (컬러, (사이즈 종류, 사이즈 값, 원본 문자열))
 
 @app.route('/product/<product_number>')
 def product_detail(product_number):
@@ -118,11 +139,14 @@ def product_detail(product_number):
     if product is None: flash("상품 없음.", 'error'); return redirect(url_for('index'))
     image_url = f"{IMAGE_URL_PREFIX}{product.product_number}.jpg"; variants_list = sorted(product.variants, key=get_sort_key); related_products = []
     if product.product_name:
-        search_words = product.product_name.split(' ');
+        search_words = product.product_name.split(' ')
         if search_words:
             search_term = search_words[-1]
             if len(search_term) > 1:
-                related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
+                related_products = Product.query.filter(
+                    Product.product_name.ilike(f'%{search_term}%'),
+                    Product.product_number != product_number
+                ).limit(5).all()
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
 
 # --- API 라우트 ---
@@ -136,7 +160,7 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
-# (*** Google Vision AI를 사용하는 /ocr_upload 함수 ***)
+# Google Vision AI를 사용하는 /ocr_upload 함수
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if vision_client is None:
@@ -161,7 +185,7 @@ def ocr_upload():
             if texts:
                 # 전체 인식 텍스트 (보통 첫 번째 항목)
                 ocr_text = texts[0].description
-                print(f"Google Vision OCR Raw Text: {ocr_text}") # 디버깅용
+                print(f"Google Vision OCR Raw Text: {ocr_text}")
 
                 cleaned_text = ocr_text.upper().replace('\n', ' ').replace('\r', ' ')
                 cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
