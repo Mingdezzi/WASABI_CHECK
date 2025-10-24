@@ -6,7 +6,7 @@ import re # 정규식 라이브러리
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import or_, func, text, Integer, String
-from sqlalchemy.orm import joinedload # (*** 수정: joinedload 임포트 추가 ***)
+from sqlalchemy.orm import joinedload # joinedload 임포트
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -116,6 +116,7 @@ def import_excel():
     return redirect(url_for('index'))
 
 # --- 웹페이지 라우트 ---
+# (*** 수정된 index 함수 ***)
 @app.route('/')
 def index():
     query = request.args.get('query', ''); showing_favorites = False
@@ -124,17 +125,16 @@ def index():
         products = Product.query.filter( or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term)) ).order_by(Product.product_name).all()
     else:
         showing_favorites = True
-        # (*** 수정: joinedload 사용 ***)
-        products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.product_name).all()
-    return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
+        # (*** 2. 수정: item_category (품목) -> product_name (품명) 순으로 정렬 ***)
+        products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.item_category, Product.product_name).all()
+    
+    # (*** 1. 수정: IMAGE_URL_PREFIX 를 템플릿에 전달 ***)
+    return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites, IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
 
 # 정렬 함수
 def get_sort_key(variant):
-    color = variant.color or ''
-    size_str = str(variant.size).upper().strip()
-    if size_str == '2XS': size_str = 'XXS'
-    elif size_str == '2XL': size_str = 'XXL'
-    elif size_str == '3XL': size_str = 'XXXL'
+    color = variant.color or ''; size_str = str(variant.size).upper().strip()
+    if size_str == '2XS': size_str = 'XXS'; elif size_str == '2XL': size_str = 'XXL'; elif size_str == '3XL': size_str = 'XXXL'
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
     if size_str.isdigit(): sort_key = (1, int(size_str), '')
     elif size_str in custom_order: sort_key = (2, custom_order.index(size_str), '')
