@@ -59,7 +59,7 @@
             <h2>스캔 검색</h2>
             <div id="qr-reader-container">
                 <div id="qr-reader" style="display: none;"></div>
-                {/* (*** 수정: 내부 텍스트 삭제 ***) */}
+                {# (*** 수정: 올바른 Jinja 주석 형식 사용 ***) #}
                 <div id="scan-region-guide"></div>
             </div>
             <div id="scanner-controls">
@@ -68,7 +68,7 @@
                 <button id="stop-scan-btn" style="display: none;">스캔 중지</button>
             </div>
             <div id="scanner-status">스캔 시작 버튼을 누르세요.</div>
-            {/* 사진 OCR용 input 삭제됨 */}
+            {# (*** 수정: 올바른 Jinja 주석 형식 사용 ***) #}
         </div>
 
         <div class="card">
@@ -122,8 +122,8 @@
                 if (isScanning) return; await stopScan();
                 statusEl.textContent = "스캔 시작 중..."; statusEl.className = 'scanner-status loading'; showVideoAndGuide(); isScanning = true;
                 const qrboxConfig = { width: 250, height: 100 };
-                html5QrCode = new Html5Qrcode("qr-reader"); const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128 ];
-                try {
+                try { // try 블록 안으로 이동
+                    html5QrCode = new Html5Qrcode("qr-reader"); const formatsToSupport = [ Html5QrcodeSupportedFormats.CODE_128 ];
                     await html5QrCode.start( { facingMode: "environment" }, { fps: 10, qrbox: qrboxConfig, formatsToSupport: formatsToSupport }, handleBarcodeSuccess, (errorMessage) => {} );
                     statusEl.textContent = "카메라 켜짐 (바코드 스캔 중...)"; statusEl.className = 'scanner-status'; showActiveButtons();
                 } catch (err) { statusEl.textContent = `카메라/스캐너 시작 불가: ${err}`; statusEl.className = 'scanner-status error'; hideVideoAndGuide(); showStartButton(); isScanning = false; console.error("Error starting scan:", err); }
@@ -145,42 +145,33 @@
                 if (!video) { statusEl.textContent = "비디오 요소를 찾을 수 없습니다."; statusEl.className = 'scanner-status error'; return; }
 
                 statusEl.textContent = "현재 화면 캡처 중..."; statusEl.className = 'scanner-status loading';
-                captureOcrBtn.disabled = true; // OCR 버튼 비활성화 (중복 방지)
+                captureOcrBtn.disabled = true;
 
                 const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                 const context = canvas.getContext('2d'); context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Canvas -> Blob 변환 (Promise 사용)
                 new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
                     .then(blob => {
                         if (!blob) { throw new Error("이미지 Blob 변환 실패."); }
                         statusEl.textContent = "이미지 서버 전송 및 OCR 처리 중..."; statusEl.className = 'scanner-status loading';
                         const formData = new FormData(); formData.append('ocr_image', blob, 'capture.png');
-                        // 서버로 전송
                         return fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData });
                     })
-                    .then(response => response.json()) // JSON 응답 받기
+                    .then(response => { // response 객체를 먼저 받고
+                         if (!response.ok) { // ok가 아니면 에러로 처리
+                             return response.json().then(errData => { throw new Error(errData.message || `서버 오류 ${response.status}`); });
+                         }
+                         return response.json(); // ok면 json 파싱
+                    })
                     .then(data => {
-                        statusEl.textContent = "서버 OCR 응답 받음."; // 응답 받았다는 메시지
-                        // 서버 응답 처리
-                        if (data.status === 'found_one') {
-                            statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; statusEl.className = 'scanner-status success';
-                            stopScan(); // 성공 시 스캔 중지
-                            window.location.href = `/product/${data.product_number}`;
-                        } else if (data.status === 'found_many') {
-                            statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; statusEl.className = 'scanner-status success';
-                            stopScan(); // 성공 시 스캔 중지
-                            window.location.href = `/?query=${encodeURIComponent(data.query)}`;
-                        } else { // 'not_found' 또는 'error'
-                            statusEl.textContent = `서버 OCR 오류: ${data.message}`; statusEl.className = 'scanner-status error';
-                            // OCR 실패 시 스캔 계속 유지 (버튼 복구)
-                            captureOcrBtn.disabled = false;
-                        }
+                        statusEl.textContent = "서버 OCR 응답 받음.";
+                        if (data.status === 'found_one') { statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; statusEl.className = 'scanner-status success'; stopScan(); window.location.href = `/product/${data.product_number}`; }
+                        else if (data.status === 'found_many') { statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; statusEl.className = 'scanner-status success'; stopScan(); window.location.href = `/?query=${encodeURIComponent(data.query)}`; }
+                        else { statusEl.textContent = `서버 OCR 오류: ${data.message}`; statusEl.className = 'scanner-status error'; captureOcrBtn.disabled = false; } // 실패 시 버튼 복구
                     })
                     .catch(error => {
                         console.error('OCR 캡처/처리 오류:', error); statusEl.textContent = `OCR 오류: ${error.message || '통신 실패'}`; statusEl.className = 'scanner-status error';
-                        // 오류 발생 시 스캔 계속 유지 (버튼 복구)
-                        captureOcrBtn.disabled = false;
+                        captureOcrBtn.disabled = false; // 오류 시 버튼 복구
                     });
             }
 
