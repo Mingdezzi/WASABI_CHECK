@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ product['product_name'] }} - WASABI_CHECK</title>
     <style>
-        /* (이전과 동일) */
+        /* (이전 스타일과 거의 동일) */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
         .container { max-width: 900px; margin: 0 auto; background-color: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .header { border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 24px; }
@@ -15,65 +15,31 @@
         .header-main .product-number { color: #555; font-size: 1.2em; font-weight: 500; }
         .btn-favorite { background-color: #f0f2f5; color: #333; border: 1px solid #ddd; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.95em; flex-shrink: 0; }
         .btn-favorite.favorited { background-color: #fff3cd; border-color: #ffeeba; color: #856404; }
+        
+        /* (*** 1. 검색창 스타일 추가 ***) */
+        .search-bar { display: flex; gap: 10px; margin-top: 15px; /* 헤더 아래 여백 */ }
+        .search-bar input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95em; }
+        .search-bar button { padding: 0 15px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.95em; }
+        .search-bar button:hover { background-color: #0056b3; }
+
         .product-image { text-align: center; margin-bottom: 24px; }
         .product-image img { width: 100%; height: 400px; object-fit: contain; border: 1px solid #eee; border-radius: 8px; background-color: #fdfdfd; }
         .product-image .error-text { display: none; color: #888; padding: 40px 0; background-color: #f8f9fa; border-radius: 8px; }
         .stock-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.95em; }
-        
-        /* (*** 수정: 테이블 셀 패딩 조정 ***) */
-        .stock-table th, .stock-table td {
-            border-bottom: 1px solid #eee; 
-            padding: 12px 10px; /* 세로 패딩 줄임 */
-            text-align: left;
-            vertical-align: middle;
-        }
+        .stock-table th, .stock-table td { border-bottom: 1px solid #eee; padding: 12px 10px; text-align: left; vertical-align: middle; }
         .stock-table th { background-color: #f8f9fa; color: #555; font-weight: 600; }
         .stock-table th:first-child { border-radius: 6px 0 0 6px; }
         .stock-table th:last-child { border-radius: 0 6px 6px 0; }
         .text-right { text-align: right !important; }
-        
-        /* (*** 수정: 재고 컨트롤 레이아웃 ***) */
-        .stock-control {
-            display: flex;          /* 가로 배치 (수량 | 버튼 스택) */
-            align-items: center;    /* 세로 중앙 정렬 */
-            justify-content: flex-end; /* 우측 정렬 */
-            gap: 8px;              /* 수량과 버튼 스택 사이 간격 */
-        }
-        .stock-quantity {
-            font-weight: 700;
-            font-size: 1.2em;
-            color: #2d8b57;
-            min-width: 30px; 
-            text-align: center;
-        }
+        .stock-control { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+        .stock-quantity { font-weight: 700; font-size: 1.2em; color: #2d8b57; min-width: 30px; text-align: center; }
         .stock-quantity.zero { color: #dc3545; }
-        
-        /* (*** 신규: 버튼 세로 스택 컨테이너 ***) */
-        .button-stack {
-            display: flex;
-            flex-direction: column; /* 세로 배치 */
-            gap: 4px;              /* 버튼 사이 간격 */
-        }
-
-        /* (*** 수정: 버튼 스타일 (직사각형) ***) */
-        .stock-control button {
-            width: 30px; height: 22px; /* 버튼 크기 조정 */
-            font-size: 1em; /* 폰트 크기 조정 */
-            font-weight: bold;
-            border: 1px solid #ccc;
-            border-radius: 4px; /* 약간 둥근 직사각형 */
-            cursor: pointer;
-            background-color: #fff;
-            color: #333;
-            line-height: 20px; /* 아이콘 중앙 정렬 */
-            padding: 0; /* 내부 패딩 제거 */
-            transition: background-color 0.2s;
-        }
+        .button-stack { display: flex; flex-direction: column; gap: 4px; }
+        .stock-control button { width: 30px; height: 22px; font-size: 1em; font-weight: bold; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background-color: #fff; color: #333; line-height: 20px; padding: 0; transition: background-color 0.2s; }
         .stock-control button.btn-inc { color: #007bff; border-color: #007bff; }
         .stock-control button.btn-dec { color: #dc3545; border-color: #dc3545; }
         .stock-control button:hover { background-color: #f4f4f4; }
         .stock-control button:disabled { opacity: 0.5; cursor: not-allowed; }
-
         .stock-hq { color: #555; }
         .discount { color: #dc3545; font-weight: 500; }
         .related-container { max-width: 900px; margin: 20px auto 0 auto; background-color: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
@@ -84,33 +50,38 @@
         .related-list a:hover { background-color: #f8f9fa; }
         .related-list .product-name { font-weight: 600; }
         .related-list .product-number { font-size: 0.9em; color: #555; margin-top: 5px; }
-
     </style>
 </head>
 <body>
     <div class="container">
-        
+
         <div class="header">
             <a href="{{ url_for('index') }}" class="back-link">&larr; 돌아가기</a>
             <div class="header-main">
                 <div>
-                    <h1>{{ product['product_name'] }}</h1>
-                    <div class="product-number">{{ product['product_number'] }}</div>
+                    <h1>{{ product.product_name }}</h1>
+                    <div class="product-number">{{ product.product_number }}</div>
                 </div>
                 <button id="fav-btn" class="btn-favorite {{ 'favorited' if product.is_favorite == 1 else '' }}" data-product-number="{{ product.product_number }}">
                     {% if product.is_favorite == 1 %} ★ 즐겨찾기 해제 {% else %} ☆ 즐겨찾기 추가 {% endif %}
                 </button>
             </div>
+
+            <div class="search-bar">
+                <form action="/" method="GET" style="display: contents;">
+                    <input type="text" name="query" placeholder="다른 상품 검색..." value="">
+                    <button type="submit">검색</button>
+                </form>
+            </div>
         </div>
 
         <div class="product-image">
-            <img src="{{ image_url }}" alt="{{ product['product_name'] }} 이미지" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <img src="{{ image_url }}" alt="{{ product.product_name }} 이미지" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
             <p class="error-text">(이미지를 불러올 수 없습니다.)</p>
         </div>
 
-        
         <h2>재고 현황</h2>
-        <div style="overflow-x: auto;"> 
+        <div style="overflow-x: auto;">
             <table class="stock-table">
                 <thead>
                     <tr>
@@ -128,29 +99,22 @@
                     <tr>
                         <td>{{ item.color }}</td>
                         <td>{{ item.size }}</td>
-                        
                         <td class="text-right">
                             <div class="stock-control">
-                                <span id="stock-{{ item.barcode }}" 
-                                      class="stock-quantity {{ 'zero' if item.store_stock == 0 else '' }}">
-                                    {{ item.store_stock }}
-                                </span>
+                                <span id="stock-{{ item.barcode }}" class="stock-quantity {{ 'zero' if item.store_stock == 0 else '' }}">{{ item.store_stock }}</span>
                                 <div class="button-stack">
                                     <button class="btn-inc" data-barcode="{{ item.barcode }}" data-change="1">+</button>
                                     <button class="btn-dec" data-barcode="{{ item.barcode }}" data-change="-1">-</button>
                                 </div>
                             </div>
                         </td>
-                        
                         <td class="text-right stock-hq">{{ item.hq_stock }}</td>
                         <td class="text-right">{{ "{:,d}".format(item.sale_price) }}</td>
                         <td class="text-right">{{ "{:,d}".format(item.original_price) }}</td>
                         <td class="text-right discount">{{ (item.discount_rate | float * 100) | int }}%</td>
                     </tr>
                     {% else %}
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 20px;">이 상품의 재고 정보가 없습니다.</td>
-                    </tr>
+                    <tr> <td colspan="7" style="text-align: center; padding: 20px;">이 상품의 재고 정보가 없습니다.</td> </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -175,12 +139,9 @@
                 table.addEventListener('click', function(e) {
                     const button = e.target.closest('button');
                     if (button && (button.classList.contains('btn-inc') || button.classList.contains('btn-dec'))) {
-                        const barcode = button.dataset.barcode;
-                        const change = parseInt(button.dataset.change, 10);
-                        const changeText = change === 1 ? "증가" : "감소";
+                        const barcode = button.dataset.barcode; const change = parseInt(button.dataset.change, 10); const changeText = change === 1 ? "증가" : "감소";
                         if (confirm(`[${barcode}] 상품의 재고를 1 ${changeText}시키겠습니까?`)) {
-                            const allButtonsInStack = button.closest('.button-stack').querySelectorAll('button');
-                            allButtonsInStack.forEach(btn => btn.disabled = true);
+                            const allButtonsInStack = button.closest('.button-stack').querySelectorAll('button'); allButtonsInStack.forEach(btn => btn.disabled = true);
                             updateStockOnServer(barcode, change, allButtonsInStack);
                         }
                     }
@@ -188,33 +149,11 @@
             }
             const favButton = document.getElementById('fav-btn');
             if (favButton) {
-                favButton.addEventListener('click', function(e) {
-                    const button = e.target; const productNumber = button.dataset.productNumber;
-                    button.disabled = true; toggleFavoriteOnServer(productNumber, button);
-                });
+                favButton.addEventListener('click', function(e) { const button = e.target; const productNumber = button.dataset.productNumber; button.disabled = true; toggleFavoriteOnServer(productNumber, button); });
             }
         });
-        function updateStockOnServer(barcode, change, buttons) {
-            fetch("{{ url_for('update_stock') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: barcode, change: change }) })
-            .then(response => response.json()).then(data => {
-                if (data.status === 'success') {
-                    const quantitySpan = document.getElementById(`stock-${data.barcode}`);
-                    quantitySpan.textContent = data.new_quantity;
-                    quantitySpan.classList.toggle('zero', data.new_quantity === 0);
-                } else { alert(`재고 오류: ${data.message}`); }
-            }).catch(error => { console.error('재고 API 오류:', error); alert('서버 통신 오류.'); })
-            .finally(() => { buttons.forEach(btn => btn.disabled = false); });
-        }
-        function toggleFavoriteOnServer(productNumber, button) {
-            fetch("{{ url_for('toggle_favorite') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_number: productNumber }) })
-            .then(response => response.json()).then(data => {
-                if (data.status === 'success') {
-                    if (data.new_favorite_status === 1) { button.textContent = '★ 즐겨찾기 해제'; button.classList.add('favorited'); }
-                    else { button.textContent = '☆ 즐겨찾기 추가'; button.classList.remove('favorited'); }
-                } else { alert(`즐겨찾기 오류: ${data.message}`); }
-            }).catch(error => { console.error('즐겨찾기 API 오류:', error); alert('서버 통신 오류.'); })
-            .finally(() => { button.disabled = false; });
-        }
+        function updateStockOnServer(barcode, change, buttons) { fetch("{{ url_for('update_stock') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: barcode, change: change }) }).then(response => response.json()).then(data => { if (data.status === 'success') { const quantitySpan = document.getElementById(`stock-${data.barcode}`); quantitySpan.textContent = data.new_quantity; quantitySpan.classList.toggle('zero', data.new_quantity === 0); } else { alert(`재고 오류: ${data.message}`); } }).catch(error => { console.error('재고 API 오류:', error); alert('서버 통신 오류.'); }).finally(() => { buttons.forEach(btn => btn.disabled = false); }); }
+        function toggleFavoriteOnServer(productNumber, button) { fetch("{{ url_for('toggle_favorite') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_number: productNumber }) }).then(response => response.json()).then(data => { if (data.status === 'success') { if (data.new_favorite_status === 1) { button.textContent = '★ 즐겨찾기 해제'; button.classList.add('favorited'); } else { button.textContent = '☆ 즐겨찾기 추가'; button.classList.remove('favorited'); } } else { alert(`즐겨찾기 오류: ${data.message}`); } }).catch(error => { console.error('즐겨찾기 API 오류:', error); alert('서버 통신 오류.'); }).finally(() => { button.disabled = false; }); }
     </script>
 
 </body>
