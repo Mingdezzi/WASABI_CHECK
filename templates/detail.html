@@ -8,26 +8,19 @@
         /* (이전 스타일과 거의 동일) */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
         .container { max-width: 900px; margin: 0 auto; background-color: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
-
-        /* --- 헤더 --- */
-        .header { margin-bottom: 24px; } /* 헤더 아래 여백 */
+        .header { margin-bottom: 24px; }
         .header .back-link { text-decoration: none; color: #007bff; font-weight: 500; display: inline-block; margin-bottom: 15px; }
-        /* 검색창 */
-        .search-bar { display: flex; gap: 10px; margin-bottom: 20px; /* 검색창 아래 여백 */ }
+        .search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
         .search-bar input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95em; }
         .search-bar button { padding: 0 15px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.95em; }
-        /* 상품 정보 */
-        .product-info { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 15px; /* 정보 아래 여백 */ }
+        .product-info { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 15px; }
         .product-details { flex-grow: 1; }
         .product-details .product-number { color: #555; font-size: 1.1em; font-weight: 600; margin-bottom: 5px; }
         .product-details h1 { margin: 0 0 5px 0; color: #333; font-size: 1.6em; line-height: 1.3; }
         .product-meta { font-size: 0.9em; color: #777; }
-        /* 즐겨찾기 버튼 */
         .btn-favorite { background-color: #f0f2f5; color: #333; border: 1px solid #ddd; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.95em; flex-shrink: 0; height: fit-content; }
         .btn-favorite.favorited { background-color: #fff3cd; border-color: #ffeeba; color: #856404; }
-        /* 구분선 */
         hr { border: none; border-top: 1px solid #eee; margin: 24px 0; }
-
         .product-image { text-align: center; margin-bottom: 24px; }
         .product-image img { width: 100%; height: 400px; object-fit: contain; border: 1px solid #eee; border-radius: 8px; background-color: #fdfdfd; }
         .product-image .error-text { display: none; color: #888; padding: 40px 0; background-color: #f8f9fa; border-radius: 8px; }
@@ -62,10 +55,10 @@
 <body>
     <div class="container">
 
-        {/* --- 수정된 헤더 영역 --- */}
+        {# --- 수정된 헤더 영역 --- #}
         <div class="header">
             <a href="{{ url_for('index') }}" class="back-link">&larr; 돌아가기</a>
-            {/* 검색창 */}
+            {# 검색창 #}
             <div class="search-bar">
                 <form action="/" method="GET" style="display: contents;">
                     <input type="text" name="query" placeholder="다른 상품 검색..." value="">
@@ -73,9 +66,9 @@
                 </form>
             </div>
         </div>
-        <hr> {/* 구분선 */}
+        <hr> {# 구분선 #}
 
-        {/* --- 상품 정보 영역 --- */}
+        {# --- 상품 정보 영역 --- #}
         <div class="product-info">
             <div class="product-details">
                 <div class="product-number">{{ product.product_number }}</div>
@@ -90,14 +83,14 @@
             </button>
         </div>
 
-        {/* --- 상품 이미지 --- */}
+        {# --- 상품 이미지 --- #}
         <div class="product-image">
             <img src="{{ image_url }}" alt="{{ product.product_name }} 이미지" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
             <p class="error-text">(이미지를 불러올 수 없습니다.)</p>
         </div>
-        <hr> {/* 구분선 */}
+        <hr> {# 구분선 #}
 
-        {/* --- 재고 현황 --- */}
+        {# --- 재고 현황 --- #}
         <div class="stock-section">
             <h2>재고 현황</h2>
             <div style="overflow-x: auto;">
@@ -110,7 +103,7 @@
                             <th class="text-right">본사재고</th>
                             <th class="text-right">최초가</th>
                             <th class="text-right">판매가</th>
-                            {/* (*** 수정: 할인율 헤더 복원 ***) */}
+                            {# 할인율 헤더 복원 #}
                             <th class="text-right">할인율</th>
                         </tr>
                     </thead>
@@ -129,9 +122,9 @@
                                 </div>
                             </td>
                             <td class="text-right stock-hq">{{ item.hq_stock }}</td>
-                            <td class="text-right">{{ "{:,d}".format(item.original_price) }}</td>
-                            <td class="text-right">{{ "{:,d}".format(item.sale_price) }}</td>
-                            {/* (*** 수정: 할인율 계산 및 표시 ***) */}
+                            <td class="text-right">{{ "{:,d}".format(item.original_price) }}</td> {# 최초가 #}
+                            <td class="text-right">{{ "{:,d}".format(item.sale_price) }}</td> {# 판매가 #}
+                            {# 할인율 계산 및 표시 #}
                             <td class="text-right discount">
                                 {% if item.original_price and item.original_price > 0 %}
                                     {{ ((1 - (item.sale_price / item.original_price)) * 100) | int }}%
@@ -141,15 +134,15 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr> <td colspan="7" style="text-align: center; padding: 20px;">이 상품의 재고 정보가 없습니다.</td> </tr> {# colspan 7으로 수정 #}
+                        <tr> <td colspan="7" style="text-align: center; padding: 20px;">이 상품의 재고 정보가 없습니다.</td> </tr> {# colspan 7 #}
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-        <hr> {/* 구분선 */}
+        <hr> {# 구분선 #}
 
-        {/* --- 연관 상품 --- */}
+        {# --- 연관 상품 --- #}
         {% if related_products %}
         <div class="related-container">
             <h2>연관 상품</h2>
