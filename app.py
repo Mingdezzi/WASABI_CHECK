@@ -5,8 +5,8 @@ import io
 import os 
 
 from flask_sqlalchemy import SQLAlchemy
-# (추가) SQLAlchemy의 ilike 등 함수 사용을 위해
-from sqlalchemy import or_
+# (*** 1. 수정: func 추가 ***)
+from sqlalchemy import or_, func
 
 app = Flask(__name__)
 
@@ -52,7 +52,6 @@ def init_db():
 @app.route('/import_excel', methods=['GET', 'POST'])
 def import_excel():
     if request.method == 'POST':
-        # ... (이전과 동일) ...
         if 'excel_file' not in request.files: flash('오류: 파일이 선택되지 않았습니다.', 'error'); return redirect(url_for('index'))
         file = request.files['excel_file']
         if file.filename == '': flash('오류: 파일이 선택되지 않았습니다.', 'error'); return redirect(url_for('index'))
@@ -118,41 +117,43 @@ def product_detail(product_number):
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
 
 # --- API 라우트 ---
+# (*** 2. 수정된 부분 ***)
 @app.route('/barcode_search', methods=['POST'])
 def barcode_search():
-    data = request.json; barcode = data.get('barcode')
-    if not barcode: return jsonify({'status': 'error', 'message': '바코드가 전송되지 않았습니다.'}), 400
-    search_barcode = barcode[:15] 
-    variant = Variant.query.filter_by(barcode=search_barcode).first()
-    if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
-    else: return jsonify({'status': 'error', 'message': f'해당 바코드({search_barcode})를 찾을 수 없습니다.'}), 404
+    """ (A1) 바코드 스캔 API (하이픈 무시, 11자리 이상 부분 일치) """
+    data = request.json
+    barcode = data.get('barcode')
+    
+    if not barcode:
+        return jsonify({'status': 'error', 'message': '바코드가 전송되지 않았습니다.'}), 400
+        
+    # 1. 스캔된 바코드에서 하이픈(-) 제거 및 공백 제거
+    scanned_clean = barcode.replace('-', '').strip()
+    
+    # 2. 11자리 미만이면 오류 처리
+    if len(scanned_clean) < 11:
+        return jsonify({'status': 'error', 'message': f'스캔된 바코드가 너무 짧습니다 ({len(scanned_clean)}자리).'}), 400
+    
+    # 3. DB 검색: DB의 barcode 컬럼에서도 하이픈을 제거하고,
+    #    정리된 스캔값(scanned_clean)으로 시작하는(`startswith`) 데이터를 찾음
+    variant = Variant.query.filter(
+        func.replace(Variant.barcode, '-', '').startswith(scanned_clean)
+    ).first()
+    
+    if variant:
+        return jsonify({'status': 'success', 'product_number': variant.product_number})
+    else:
+        return jsonify({'status': 'error', 'message': f'DB에서 일치하는 바코드를 찾을 수 없습니다.'}), 404
 
-# (*** 신규 API: OCR 텍스트 검색 ***)
 @app.route('/text_search', methods=['POST'])
 def text_search():
-    """ 사진에서 OCR로 읽은 텍스트로 상품 검색 """
-    data = request.json
-    text = data.get('text', '').strip() # 앞뒤 공백 제거
-    
-    if not text:
-        return jsonify({'status': 'error', 'message': '검색할 텍스트가 없습니다.'}), 400
-        
+    data = request.json; text = data.get('text', '').strip()
+    if not text: return jsonify({'status': 'error', 'message': '검색할 텍스트가 없습니다.'}), 400
     search_term = f'%{text}%'
-    
-    # 품번 또는 품명에서 대소문자 무시하고 검색
-    results = Product.query.filter(
-        or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term))
-    ).all()
-    
-    if len(results) == 1:
-        # 딱 1개 찾았을 때 -> 상세 페이지로 이동
-        return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
-    elif len(results) > 1:
-        # 여러 개 찾았을 때 -> 검색 결과 페이지로 이동 (텍스트를 query로 넘김)
-        return jsonify({'status': 'found_many', 'query': text})
-    else:
-        # 하나도 못 찾았을 때
-        return jsonify({'status': 'not_found', 'message': f'"{text}" 포함 상품 없음.'}), 404
+    results = Product.query.filter( or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term)) ).all()
+    if len(results) == 1: return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
+    elif len(results) > 1: return jsonify({'status': 'found_many', 'query': text})
+    else: return jsonify({'status': 'not_found', 'message': f'"{text}" 포함 상품 없음.'}), 404
 
 @app.route('/update_stock', methods=['POST'])
 def update_stock():
