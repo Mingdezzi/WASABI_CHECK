@@ -94,42 +94,26 @@ def index():
 def get_sort_key(variant):
     color = variant.color or ''
     size_str = str(variant.size).upper().strip()
-
-    # 사이즈 동의어 처리
-    if size_str == '2XS':
-        size_str = 'XXS'
-    elif size_str == '2XL':
-        size_str = 'XXL'
-    elif size_str == '3XL':
-        size_str = 'XXXL'
-
+    if size_str == '2XS': size_str = 'XXS'
+    elif size_str == '2XL': size_str = 'XXL'
+    elif size_str == '3XL': size_str = 'XXXL'
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-
-    # 정렬 키 생성
-    if size_str.isdigit():
-        sort_key = (1, int(size_str), '') # 숫자 우선
-    elif size_str in custom_order:
-        sort_key = (2, custom_order.index(size_str), '') # 커스텀 알파벳 순서
-    else:
-        sort_key = (3, 0, size_str) # 나머지 알파벳
-
-    return (color, sort_key) # 최종 키: (컬러, (사이즈 종류, 사이즈 값, 원본 문자열))
+    if size_str.isdigit(): sort_key = (1, int(size_str), '')
+    elif size_str in custom_order: sort_key = (2, custom_order.index(size_str), '')
+    else: sort_key = (3, 0, size_str)
+    return (color, sort_key)
 
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
     if product is None: flash("상품 없음.", 'error'); return redirect(url_for('index'))
     image_url = f"{IMAGE_URL_PREFIX}{product.product_number}.jpg"; variants_list = sorted(product.variants, key=get_sort_key); related_products = []
-    # 연관 상품 로직
     if product.product_name:
-        search_words = product.product_name.split(' ')
+        search_words = product.product_name.split(' ');
         if search_words:
             search_term = search_words[-1]
             if len(search_term) > 1:
-                related_products = Product.query.filter(
-                    Product.product_name.ilike(f'%{search_term}%'),
-                    Product.product_number != product_number
-                ).limit(5).all()
+                related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
 
 
@@ -144,7 +128,7 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
-# 서버 OCR API
+# (*** 수정된 /ocr_upload 함수 ***)
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if 'ocr_image' not in request.files: return jsonify({'status': 'error', 'message': '이미지 파일 없음.'}), 400
@@ -155,32 +139,39 @@ def ocr_upload():
             img = Image.open(file.stream)
             custom_config = r'--oem 3 --psm 6 -l kor+eng'
             ocr_text = pytesseract.image_to_string(img, config=custom_config)
-            print(f"Server OCR Raw Text: {ocr_text}") # 디버깅용
+            print(f"Server OCR Raw Text: {ocr_text}")
 
             cleaned_text = ocr_text.upper().replace('\n', ' ').replace('\r', ' ')
-            cleaned_text = re.sub(r'\s+', ' ', cleaned_text) # 여러 공백 -> 하나로
+            cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
 
             product_number_pattern = r'\bM[A-Z0-9-]{4,}\b'
             matches = re.findall(product_number_pattern, cleaned_text)
-            print(f"Found Product Number Candidates: {matches}") # 디버깅용
+            print(f"Found Product Number Candidates: {matches}")
 
             if matches:
-                search_text = matches[0] # 첫 번째 후보 사용
-                search_term = f'%{search_text}%'
+                search_text_raw = matches[0] # 찾은 첫 번째 후보 (하이픈 포함 가능)
+                
+                # (*** 1. 하이픈 제거 ***)
+                search_text_cleaned = search_text_raw.replace('-', '')
+
+                # (*** 2. DB 검색 방식 변경 ***)
+                # DB의 product_number에서도 하이픈 제거 후, cleaned로 시작하는지 검색
                 results = Product.query.filter(
-                    or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term))
+                    func.replace(Product.product_number, '-', '').startswith(search_text_cleaned)
                 ).all()
+                print(f"Searching DB with cleaned prefix: {search_text_cleaned}, Found: {len(results)}") # 디버깅용
 
                 if len(results) == 1:
                     return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
                 elif len(results) > 1:
-                    return jsonify({'status': 'found_many', 'query': search_text})
+                    # 여러 개 찾으면 원본(하이픈 포함 가능)으로 검색 결과 보여주기
+                    return jsonify({'status': 'found_many', 'query': search_text_raw})
                 else:
-                    return jsonify({'status': 'not_found', 'message': f'"{search_text}" 상품 없음.'}), 404
+                    return jsonify({'status': 'not_found', 'message': f'"{search_text_raw}" 시작 상품 없음.'}), 404
             else:
                 return jsonify({'status': 'error', 'message': 'OCR 결과에서 품번 패턴(M...) 못 찾음.'}), 400
         except Exception as e:
-            print(f"Server OCR Error: {e}") # 디버깅용
+            print(f"Server OCR Error: {e}")
             return jsonify({'status': 'error', 'message': f'서버 OCR 오류: {e}'}), 500
 
     return jsonify({'status': 'error', 'message': '파일 처리 중 알 수 없는 오류.'}), 500
