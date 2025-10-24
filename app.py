@@ -1,9 +1,8 @@
-import sqlite3
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, g, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 import io
 import os
-import re # 정규식 라이브러리
+import re # 정규식 라이브러리 (한 번만 import)
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import or_, func, text
@@ -13,7 +12,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # 서버 OCR 라이브러리
 import pytesseract
 from PIL import Image
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename # (한 번만 import)
 
 app = Flask(__name__)
 
@@ -34,12 +33,22 @@ IMAGE_URL_PREFIX = 'https://files.ebizway.co.kr/files/10249/Style/'
 # --- DB 모델 정의 ---
 class Product(db.Model):
     __tablename__ = 'products'
-    product_number = db.Column(db.String, primary_key=True); product_name = db.Column(db.String, nullable=False); is_favorite = db.Column(db.Integer, default=0)
+    product_number = db.Column(db.String, primary_key=True)
+    product_name = db.Column(db.String, nullable=False)
+    is_favorite = db.Column(db.Integer, default=0)
     variants = db.relationship('Variant', backref='product', lazy=True, cascade="all, delete-orphan")
+
 class Variant(db.Model):
-    __tablename__ = 'variants'; barcode = db.Column(db.String, primary_key=True); product_number = db.Column(db.String, db.ForeignKey('products.product_number'), nullable=False)
-    color = db.Column(db.String); size = db.Column(db.String); store_stock = db.Column(db.Integer, default=0); hq_stock = db.Column(db.Integer, default=0)
-    original_price = db.Column(db.Integer, default=0); sale_price = db.Column(db.Integer, default=0); discount_rate = db.Column(db.String)
+    __tablename__ = 'variants'
+    barcode = db.Column(db.String, primary_key=True)
+    product_number = db.Column(db.String, db.ForeignKey('products.product_number'), nullable=False)
+    color = db.Column(db.String)
+    size = db.Column(db.String)
+    store_stock = db.Column(db.Integer, default=0)
+    hq_stock = db.Column(db.Integer, default=0)
+    original_price = db.Column(db.Integer, default=0)
+    sale_price = db.Column(db.Integer, default=0)
+    discount_rate = db.Column(db.String)
 
 # --- DB 초기화 함수 ---
 def init_db():
@@ -81,12 +90,12 @@ def index():
     else: showing_favorites = True; products = Product.query.filter_by(is_favorite=1).order_by(Product.product_name).all()
     return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
 
-# (*** SyntaxError 수정된 부분 ***)
+# (*** 정리된 get_sort_key 함수 ***)
 def get_sort_key(variant):
     color = variant.color or ''
     size_str = str(variant.size).upper().strip()
 
-    # 사이즈 동의어 처리
+    # 사이즈 동의어 처리 (중복 제거)
     if size_str == '2XS':
         size_str = 'XXS'
     elif size_str == '2XL':
@@ -96,7 +105,7 @@ def get_sort_key(variant):
 
     custom_order = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
 
-    # 정렬 키 생성
+    # 정렬 키 생성 (중복 제거)
     if size_str.isdigit():
         sort_key = (1, int(size_str), '') # 숫자 우선
     elif size_str in custom_order:
@@ -104,25 +113,23 @@ def get_sort_key(variant):
     else:
         sort_key = (3, 0, size_str) # 나머지 알파벳
 
-    return (color, sort_key) # 최종 키: (컬러, (사이즈 종류, 사이즈 값, 원본 문자열))
-
+    return (color, sort_key)
 
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
     if product is None: flash("상품 없음.", 'error'); return redirect(url_for('index'))
     image_url = f"{IMAGE_URL_PREFIX}{product.product_number}.jpg"; variants_list = sorted(product.variants, key=get_sort_key); related_products = []
+    # 연관 상품 로직 (중복 제거)
     if product.product_name:
-        # 품명에서 마지막 단어 추출 (공백 기준)
         search_words = product.product_name.split(' ')
-        if search_words: # 품명이 비어있지 않다면
-            search_term = search_words[-1] # 마지막 단어
-            # 검색어가 1글자 초과일 때만 연관 상품 검색
+        if search_words:
+            search_term = search_words[-1]
             if len(search_term) > 1:
                 related_products = Product.query.filter(
-                    Product.product_name.ilike(f'%{search_term}%'), # 마지막 단어 포함
-                    Product.product_number != product_number       # 자기 자신 제외
-                ).limit(5).all() # 최대 5개
+                    Product.product_name.ilike(f'%{search_term}%'),
+                    Product.product_number != product_number
+                ).limit(5).all()
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
 
 
@@ -137,6 +144,7 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
+# (*** 정리된 /ocr_upload 함수 ***)
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if 'ocr_image' not in request.files: return jsonify({'status': 'error', 'message': '이미지 파일 없음.'}), 400
@@ -147,21 +155,37 @@ def ocr_upload():
             img = Image.open(file.stream)
             custom_config = r'--oem 3 --psm 6 -l kor+eng'
             ocr_text = pytesseract.image_to_string(img, config=custom_config)
-            print(f"Server OCR Raw Text: {ocr_text}")
-            cleaned_text = ocr_text.upper().replace('\n', ' ').replace('\r', ' '); cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+            print(f"Server OCR Raw Text: {ocr_text}") # 디버깅용 로그
+
+            cleaned_text = ocr_text.upper().replace('\n', ' ').replace('\r', ' ')
+            cleaned_text = re.sub(r'\s+', ' ', cleaned_text) # 여러 공백 -> 하나로
+
             product_number_pattern = r'\bM[A-Z0-9-]{4,}\b'
             matches = re.findall(product_number_pattern, cleaned_text)
-            print(f"Found Product Number Candidates: {matches}")
+            print(f"Found Product Number Candidates: {matches}") # 디버깅용 로그
+
             if matches:
-                search_text = matches[0]
+                search_text = matches[0] # 첫 번째 후보 사용
                 search_term = f'%{search_text}%'
-                results = Product.query.filter( or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term)) ).all()
-                if len(results) == 1: return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
-                elif len(results) > 1: return jsonify({'status': 'found_many', 'query': search_text})
-                else: return jsonify({'status': 'not_found', 'message': f'"{search_text}" 상품 없음.'}), 404
-            else: return jsonify({'status': 'error', 'message': 'OCR 결과에서 품번 패턴(M...) 못 찾음.'}), 400
-        except Exception as e: print(f"Server OCR Error: {e}"); return jsonify({'status': 'error', 'message': f'서버 OCR 오류: {e}'}), 500
+                results = Product.query.filter(
+                    or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term))
+                ).all()
+
+                if len(results) == 1:
+                    return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
+                elif len(results) > 1:
+                    return jsonify({'status': 'found_many', 'query': search_text})
+                else:
+                    return jsonify({'status': 'not_found', 'message': f'"{search_text}" 상품 없음.'}), 404
+            else:
+                # 품번 패턴 못 찾음 (중복 제거)
+                return jsonify({'status': 'error', 'message': 'OCR 결과에서 품번 패턴(M...) 못 찾음.'}), 400
+        except Exception as e:
+            print(f"Server OCR Error: {e}") # 디버깅용 로그 (중복 제거)
+            return jsonify({'status': 'error', 'message': f'서버 OCR 오류: {e}'}), 500
+
     return jsonify({'status': 'error', 'message': '파일 처리 중 알 수 없는 오류.'}), 500
+
 
 @app.route('/text_search', methods=['POST'])
 def text_search():
