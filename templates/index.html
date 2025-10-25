@@ -43,11 +43,12 @@
             cursor: pointer;
             font-weight: 500;
             font-size: 1em;
+            flex-shrink: 0; /* 버튼 안줄어들게 */
         }
         #start-voice-search-btn {
-            padding: 0 12px;
-            background-color: #6f42c1;
-            font-size: 1.2em;
+            padding: 0 12px; /* 아이콘 버튼 크기 */
+            background-color: #6f42c1; /* 보라색 */
+            font-size: 1.2em; /* 아이콘 크기 */
             flex-shrink: 0; /* 음성 버튼은 줄어들지 않도록 */
         }
         #start-voice-search-btn:disabled { background-color: #ccc; }
@@ -116,11 +117,11 @@
         <div class="card">
             <h2>상품 검색</h2>
             <div class="search-bar">
-                <form action="/" method="GET" id="search-form" style="display: flex; flex-grow: 1; gap: 10px;">
-                    <input type="text" id="search-query-input" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}" style="flex-grow: 1;">
+                <form action="/" method="GET" id="search-form">
+                    <input type="text" id="search-query-input" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}">
                     <button type="submit">검색</button>
                 </form>
-                <button id="start-voice-search-btn" title="음성 검색" style="flex-shrink: 0;">🎤</button>
+                <button id="start-voice-search-btn" title="음성 검색">🎤</button>
             </div>
         </div>
 
@@ -198,19 +199,18 @@
             async function captureAndReadBarcode() {
                 if (!isScanning || !videoEl.srcObject) { statusEl.textContent = "먼저 스캔을 시작해주세요."; statusEl.className = 'scanner-status error'; return; }
                 statusEl.textContent = "바코드 분석 중..."; statusEl.className = 'scanner-status loading';
-                barcodeReadBtn.disabled = true; // 현재 버튼만 비활성화
-                partNumberOcrBtn.disabled = true; // 다른 버튼도 비활성화
+                barcodeReadBtn.disabled = true; partNumberOcrBtn.disabled = true;
                 try {
                     const canvas = document.createElement('canvas'); canvas.width = videoEl.videoWidth; canvas.height = videoEl.videoHeight;
                     const context = canvas.getContext('2d'); context.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
                     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                     if (!blob) { throw new Error("이미지 Blob 변환 실패."); }
                     const imageFile = new File([blob], "barcode_capture.png", { type: 'image/png' });
-                    if (!photoQrCode) { photoQrCode = new Html5Qrcode("scanner-section", { verbose: false }); }
-                    const decodedText = await photoQrCode.scanFile(imageFile, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] });
+                    if (!photoQrCode) { photoQrCode = new Html5Qrcode("scanner-section", { verbose: false }); } // verbose: false (로그 줄이기)
+                    const decodedText = await photoQrCode.scanFile(imageFile, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] } );
                     handleBarcodeSuccess(decodedText); // 성공 시 서버 전송
                 } catch (err) {
-                    statusEl.textContent = `바코드 인식 실패: ${err.message || err}`; // (피드백)
+                    statusEl.textContent = `바코드 인식 실패. (다시 시도하세요)`; // (피드백)
                     statusEl.className = 'scanner-status error';
                     console.error("Barcode reading failed:", err);
                     reEnableButtons(); // (*** 1. 수정: 실패 시 버튼 복구 ***)
@@ -220,8 +220,8 @@
             // 바코드 성공 시 서버 전송 (페이지 이동)
             function handleBarcodeSuccess(decodedText) {
                 console.log(`바코드 성공: ${decodedText}`);
-                statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`; // (피드백)
-                statusEl.className = 'scanner-status loading'; // 로딩 중으로 변경
+                statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`;
+                statusEl.className = 'scanner-status loading';
                 fetch("{{ url_for('barcode_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText }) })
                 .then(response => response.json())
                 .then(data => {
@@ -245,8 +245,7 @@
             async function captureFrameForOcr() {
                 if (!isScanning || !videoEl.srcObject || !videoEl.videoWidth || !videoEl.videoHeight) { statusEl.textContent = "비디오 준비 안됨."; statusEl.className = 'scanner-status error'; return; }
                 statusEl.textContent = "가이드 영역 캡처 및 OCR 처리 중..."; statusEl.className = 'scanner-status loading';
-                partNumberOcrBtn.disabled = true; // 현재 버튼 비활성화
-                barcodeReadBtn.disabled = true; // 다른 버튼도 비활성화
+                partNumberOcrBtn.disabled = true; barcodeReadBtn.disabled = true;
                 try {
                     const vw = videoEl.videoWidth; const vh = videoEl.videoHeight; const dispW = videoEl.clientWidth; const dispH = videoEl.clientHeight; const boxW = qrboxConfig.width; const boxH = qrboxConfig.height; const scaleX = vw / dispW; const scaleY = vh / dispH; const boxClientX = (dispW - boxW) / 2; const boxClientY = (dispH - boxH) / 2; const sx = Math.max(0, boxClientX * scaleX); const sy = Math.max(0, boxClientY * scaleY); const sWidth = Math.min(vw - sx, boxW * scaleX); const sHeight = Math.min(vh - sy, boxH * scaleY);
                     const canvas = document.createElement('canvas'); canvas.width = sWidth; canvas.height = sHeight; const context = canvas.getContext('2d'); context.drawImage(videoEl, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
@@ -257,8 +256,7 @@
                         try {
                             const response = await fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData });
                             const data = await response.json();
-                            // (*** 1. 수정: OCR은 성공/실패 시 항상 스캔 중지 ***)
-                            stopScan(); 
+                            stopScan(); // OCR은 시도 후 무조건 스캔 중지
                             if (response.ok) {
                                 if (data.status === 'found_one') { statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; statusEl.className = 'scanner-status success'; window.location.href = `/product/${data.product_number}`; }
                                 else if (data.status === 'found_many') { statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; statusEl.className = 'scanner-status success'; window.location.href = `/?query=${encodeURIComponent(data.query)}`; }
@@ -271,7 +269,7 @@
                     reEnableButtons(); // (*** 1. 수정: 캡처 실패 시 버튼 복구 ***)
                 }
             }
-
+            
             // --- 3. 음성 검색 ---
             const voiceSearchBtn = document.getElementById('start-voice-search-btn');
             const searchInput = document.getElementById('search-query-input');
