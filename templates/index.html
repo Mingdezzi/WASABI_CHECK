@@ -187,12 +187,13 @@
             function hideVideoAndGuide() { videoEl.style.display = 'none'; scanRegionGuideEl.style.display = 'none'; }
             function showActiveButtons() { stopBtn.style.display = 'inline-block'; barcodeReadBtn.style.display = 'inline-block'; partNumberOcrBtn.style.display = 'inline-block'; startBtn.style.display = 'none'; }
             function showStartButton() { stopBtn.style.display = 'none'; barcodeReadBtn.style.display = 'none'; partNumberOcrBtn.style.display = 'none'; startBtn.style.display = 'inline-block'; isScanning = false; }
-            // (*** 1. 신규: 버튼 재활성화 함수 ***)
+            
+            // (*** 1. 수정: 버튼 재활성화 함수 (텍스트 설정 제거) ***)
             function reEnableButtons() {
                 barcodeReadBtn.disabled = false;
                 partNumberOcrBtn.disabled = false;
-                statusEl.textContent = "카메라 켜짐. 다시 시도하세요."; // 피드백
-                statusEl.className = 'scanner-status'; // 상태 초기화
+                // statusEl.textContent = "카메라 켜짐. 다시 시도하세요."; // <-- 덮어쓰기 삭제
+                // statusEl.className = 'scanner-status'; // <-- 덮어쓰기 삭제
             }
             
             async function stopScan() { if (!isScanning) return; statusEl.textContent = "스캔 중지 중..."; isScanning = false; partNumberOcrBtn.disabled = false; barcodeReadBtn.disabled = false; if (stream) { stream.getTracks().forEach(track => track.stop()); stream = null; console.log("Camera stream stopped."); } videoEl.srcObject = null; hideVideoAndGuide(); showStartButton(); statusEl.textContent = "스캔이 중지되었습니다."; statusEl.className = 'scanner-status'; }
@@ -209,7 +210,7 @@
                     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                     if (!blob) { throw new Error("이미지 Blob 변환 실패."); }
                     const imageFile = new File([blob], "barcode_capture.png", { type: 'image/png' });
-                    if (!photoQrCode) { photoQrCode = new Html5Qrcode("scanner-section", { verbose: false }); } // verbose: false (로그 줄이기)
+                    if (!photoQrCode) { photoQrCode = new Html5Qrcode("scanner-section", { verbose: false }); }
                     const decodedText = await photoQrCode.scanFile(imageFile, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] } );
                     handleBarcodeSuccess(decodedText); // 성공 시 서버 전송
                 } catch (err) {
@@ -218,6 +219,7 @@
                     console.error("Barcode reading failed:", err);
                     reEnableButtons(); // (*** 1. 수정: 실패 시 버튼 복구 ***)
                 }
+                // (*** 1. 수정: finally 블록 삭제 ***)
             }
 
             // 바코드 성공 시 서버 전송 (페이지 이동)
