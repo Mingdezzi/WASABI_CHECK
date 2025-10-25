@@ -23,7 +23,7 @@
         .search-bar input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; min-width: 0; }
         .search-bar button { padding: 0 20px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 1em; flex-shrink: 0; }
         
-        /* (*** 신규: 상세검색 버튼 스타일 ***) */
+        /* (상세검색 버튼 스타일) */
         .btn-advanced-search {
             padding: 0 15px;
             background-color: #6c757d;
@@ -71,7 +71,7 @@
         #scanner-status.error { background-color: #f8d7da; color: #721c24; }
         #scanner-status.loading { background-color: #fff3cd; color: #856404; }
 
-        /* (*** 1. 신규: 상세검색 모달 CSS ***) */
+        /* (상세검색 모달 CSS) */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.5); display: none;
@@ -91,7 +91,7 @@
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em; }
         .form-group input {
             width: 100%; padding: 8px; border: 1px solid #ddd;
-            border-radius: 6px; box-sizing: border-box; /* 100% width용 */
+            border-radius: 6px; box-sizing: border-box; 
         }
         .form-row { display: flex; gap: 10px; }
         .form-row .form-group { flex: 1; }
@@ -410,15 +410,17 @@
                     captureOcrBtn.disabled = false;
                 }
             }
-            startBtn.addEventListener('click', startBarcodeScan); // 오타 수정: startBtn -> startBarcodeBtn
+
+            // --- (*** 1. 오타 수정 ***) ---
+            // 'startBtn'을 'startBarcodeBtn'으로 수정
+            startBarcodeBtn.addEventListener('click', startBarcodeScan);
             startOcrBtn.addEventListener('click', startOcrScan);
             captureOcrBtn.addEventListener('click', captureFrameForOcr);
             stopBtn.addEventListener('click', stopScan);
 
-            // --- (*** 4. 신규: 상세검색 모달 JavaScript ***) ---
+            // --- (상세검색 모달 JavaScript - 변경 없음) ---
             const modal = document.getElementById('advanced-search-modal');
             
-            // 전역 함수로 선언하여 onclick에서 호출 가능하게 함
             window.openAdvancedSearch = function() {
                 if (modal) modal.style.display = 'flex';
             }
@@ -426,7 +428,6 @@
                 if (modal) modal.style.display = 'none';
             }
             
-            // 오버레이 클릭 시 닫기
             if (modal) {
                 modal.addEventListener('click', function(e) {
                     if (e.target === modal) {
