@@ -263,12 +263,22 @@
             const qrReaderContainer = document.getElementById('qr-reader-container');
             let html5QrCode = null;
 
-            html5QrCode = new Html5Qrcode("qr-reader-container", { 
-                formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] 
-            });
+            try {
+                html5QrCode = new Html5Qrcode("qr-reader-container", { 
+                    formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] 
+                });
+            } catch (e) {
+                console.error("Html5Qrcode 라이브러리 초기화 실패.", e);
+                statusEl.textContent = "QR 코드 라이브러리 로딩 실패.";
+                statusEl.className = 'scanner-status error';
+                // 라이브러리 로드 실패 시 스캔 버튼 비활성화
+                startBarcodeBtn.disabled = true;
+                startOcrBtn.disabled = true;
+            }
 
             // (스캔 함수들 - 변경 없음)
             function startBarcodeScan() {
+                if (!html5QrCode) return;
                 statusEl.textContent = "카메라 켜는 중 (바코드 모드)...";
                 statusEl.className = 'scanner-status loading';
                 startBarcodeBtn.style.display = 'none';
@@ -287,6 +297,7 @@
                 });
             }
             function startOcrScan() {
+                if (!html5QrCode) return;
                 statusEl.textContent = "카메라 켜는 중 (OCR 모드)...";
                 statusEl.className = 'scanner-status loading';
                 startBarcodeBtn.style.display = 'none';
@@ -305,6 +316,7 @@
                 });
             }
             function stopScan() {
+                if (!html5QrCode) return;
                 statusEl.textContent = "스캔 중지 중...";
                 try {
                     html5QrCode.stop().then(ignore => {
@@ -332,6 +344,7 @@
                 }
             }
             function handleBarcodeSuccess(decodedText, decodedResult) {
+                if (!html5QrCode) return;
                 html5QrCode.pause(true); 
                 statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`;
                 statusEl.className = 'scanner-status loading';
@@ -412,15 +425,16 @@
             }
 
             // --- (*** 1. 오타 수정 ***) ---
-            // 'startBtn'을 'startBarcodeBtn'으로 수정
-            startBarcodeBtn.addEventListener('click', startBarcodeScan);
-            startOcrBtn.addEventListener('click', startOcrScan);
-            captureOcrBtn.addEventListener('click', captureFrameForOcr);
-            stopBtn.addEventListener('click', stopScan);
+            // 'startBtn'을 'startBarcodeBtn'으로 수정했습니다.
+            if (startBarcodeBtn) startBarcodeBtn.addEventListener('click', startBarcodeScan);
+            if (startOcrBtn) startOcrBtn.addEventListener('click', startOcrScan);
+            if (captureOcrBtn) captureOcrBtn.addEventListener('click', captureFrameForOcr);
+            if (stopBtn) stopBtn.addEventListener('click', stopScan);
 
-            // --- (상세검색 모달 JavaScript - 변경 없음) ---
+            // --- (상세검색 모달 JavaScript) ---
             const modal = document.getElementById('advanced-search-modal');
             
+            // 이제 이 함수들은 스크립트 오류 없이 정상적으로 정의됩니다.
             window.openAdvancedSearch = function() {
                 if (modal) modal.style.display = 'flex';
             }
