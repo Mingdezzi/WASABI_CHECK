@@ -51,7 +51,6 @@ else:
         except Exception as e:
             print(f"Error initializing local Google Vision Client: {e}")
 
-# (*** 신규: 이미지 URL Prefix를 모든 템플릿에 전달 ***)
 @app.context_processor
 def inject_image_url_prefix():
     return dict(IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
@@ -120,6 +119,8 @@ def import_excel():
     return redirect(url_for('index'))
 
 # --- 웹페이지 라우트 ---
+
+# (*** 1. 수정: index 함수 ***)
 @app.route('/')
 def index():
     query = request.args.get('query', ''); showing_favorites = False
@@ -130,7 +131,119 @@ def index():
         showing_favorites = True
         products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.item_category, Product.product_name).all()
     
-    return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
+    # (*** 수정: advanced_search_params 추가 ***)
+    return render_template(
+        'index.html', 
+        products=products, 
+        query=query, 
+        showing_favorites=showing_favorites, 
+        advanced_search_params={} # 일반 접속 시 빈 딕셔너리 전달
+    )
+
+# (*** 2. 신규: 상세 검색 라우트 추가 ***)
+@app.route('/advanced_search')
+def advanced_search():
+    try:
+        # Base query with join
+        query = Product.query.join(Product.variants)
+        
+        # Get all search parameters
+        params = request.args
+        search_active = False
+        query_summary_parts = []
+
+        # --- Apply filters ---
+        if params.get('product_number'):
+            value = params.get('product_number')
+            query = query.filter(Product.product_number.ilike(f"%{value}%"))
+            search_active = True; query_summary_parts.append(f"품번: {value}")
+
+        if params.get('product_name'):
+            value = params.get('product_name')
+            query = query.filter(Product.product_name.ilike(f"%{value}%"))
+            search_active = True; query_summary_parts.append(f"품명: {value}")
+
+        if params.get('color'):
+            value = params.get('color')
+            query = query.filter(Variant.color.ilike(f"%{value}%"))
+            search_active = True; query_summary_parts.append(f"색상: {value}")
+
+        if params.get('size'):
+            value = params.get('size')
+            query = query.filter(Variant.size.ilike(f"%{value}%"))
+            search_active = True; query_summary_parts.append(f"사이즈: {value}")
+        
+        if params.get('release_year'):
+            try:
+                year = int(params.get('release_year'))
+                query = query.filter(Product.release_year == year)
+                search_active = True; query_summary_parts.append(f"년도: {year}")
+            except ValueError: pass 
+
+        if params.get('item_category'):
+            value = params.get('item_category')
+            query = query.filter(Product.item_category.ilike(f"%{value}%"))
+            search_active = True; query_summary_parts.append(f"품목: {value}")
+        
+        # Price filters
+        if params.get('original_price_min'):
+            try:
+                value = int(params.get('original_price_min'))
+                query = query.filter(Variant.original_price >= value)
+                search_active = True; query_summary_parts.append(f"최초가(min): {value}")
+            except ValueError: pass
+        
+        if params.get('original_price_max'):
+            try:
+                value = int(params.get('original_price_max'))
+                query = query.filter(Variant.original_price <= value)
+                search_active = True; query_summary_parts.append(f"최초가(max): {value}")
+            except ValueError: pass
+
+        if params.get('sale_price_min'):
+            try:
+                value = int(params.get('sale_price_min'))
+                query = query.filter(Variant.sale_price >= value)
+                search_active = True; query_summary_parts.append(f"판매가(min): {value}")
+            except ValueError: pass
+        
+        if params.get('sale_price_max'):
+            try:
+                value = int(params.get('sale_price_max'))
+                query = query.filter(Variant.sale_price <= value)
+                search_active = True; query_summary_parts.append(f"판매가(max): {value}")
+            except ValueError: pass
+
+        # Discount filter
+        if params.get('min_discount'):
+            try:
+                min_discount_percent = int(params.get('min_discount'))
+                if min_discount_percent > 0:
+                    ratio = 1.0 - (min_discount_percent / 100.0)
+                    query = query.filter(Variant.original_price > 0) 
+                    query = query.filter(Variant.sale_price <= (Variant.original_price * ratio))
+                    search_active = True; query_summary_parts.append(f"할인율: {min_discount_percent}% 이상")
+            except ValueError: pass
+
+        # If no search params, just return an empty list
+        if not search_active:
+            products = []
+            query_summary = "상세 검색: 조건 없음"
+        else:
+            products = query.distinct().order_by(Product.product_name).all()
+            query_summary = f"상세 검색: {', '.join(query_summary_parts)}"
+
+        return render_template(
+            'index.html', 
+            products=products, 
+            query=query_summary, 
+            showing_favorites=False,
+            advanced_search_params=params # Pass params back to re-fill form
+        )
+    
+    except Exception as e:
+        flash(f"검색 오류: {e}", 'error')
+        return redirect(url_for('index'))
 
 # 정렬 함수
 def get_sort_key(variant):
@@ -144,6 +257,7 @@ def get_sort_key(variant):
     else: sort_key = (3, 0, size_str)
     return (color, sort_key)
 
+# (*** 3. 수정: product_detail 함수 ***)
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
@@ -156,7 +270,16 @@ def product_detail(product_number):
             search_term = search_words[-1]
             if len(search_term) > 1:
                 related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
-    return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
+    
+    # (*** 수정: advanced_search_params 추가 ***)
+    return render_template( 
+        'detail.html', 
+        product=product, 
+        image_url=image_url, 
+        variants=variants_list, 
+        related_products=related_products,
+        advanced_search_params={} # 일반 접속 시 빈 딕셔너리 전달
+    )
 
 # --- API 라우트 ---
 @app.route('/barcode_search', methods=['POST'])
@@ -198,39 +321,27 @@ def ocr_upload():
         except Exception as e: print(f"Server OCR Error (Google Vision): {e}"); return jsonify({'status': 'error', 'message': f'서버 OCR 오류: {e}'}), 500
     return jsonify({'status': 'error', 'message': '파일 처리 중 알 수 없는 오류.'}), 500
 
-# (*** 수정된 /text_search 함수 ***)
 @app.route('/text_search', methods=['POST'])
 def text_search():
     data = request.json
-    text_raw = data.get('text', '').strip() # 예: "M 2 4" 또는 "모압 스피드"
-    
+    text_raw = data.get('text', '').strip() 
     if not text_raw:
         return jsonify({'status': 'error', 'message': '검색할 텍스트가 없습니다.'}), 400
-        
-    # 1. 원본 텍스트로 검색 (품명 검색용)
     search_term_asis = f'%{text_raw}%'
-    
-    # 2. 공백 제거 텍스트로 검색 (품번 검색용)
     text_cleaned = text_raw.replace(' ', '')
     search_term_cleaned = f'%{text_cleaned}%'
-
-    # (*** 수정: 3가지 조건으로 검색 ***)
     results = Product.query.filter(
         or_(
-            Product.product_name.ilike(search_term_asis), # 1. 품명 (공백 포함)
-            Product.product_number.ilike(search_term_asis), # 2. 품번 (공백 포함 - 혹시 모르니)
-            Product.product_number.ilike(search_term_cleaned)  # 3. 품번 (공백 제거)
+            Product.product_name.ilike(search_term_asis), 
+            Product.product_number.ilike(search_term_asis), 
+            Product.product_number.ilike(search_term_cleaned)
         )
     ).all()
-    
     if len(results) == 1:
-        # 딱 1개 찾았을 때 -> 상세 페이지로 이동
         return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
     elif len(results) > 1:
-        # 여러 개 찾았을 때 -> 검색 결과 페이지로 이동 (원본 텍스트 기준)
         return jsonify({'status': 'found_many', 'query': text_raw})
     else:
-        # 하나도 못 찾았을 때
         return jsonify({'status': 'not_found', 'message': f'"{text_raw}" 포함 상품 없음.'}), 404
 
 @app.route('/update_stock', methods=['POST'])
