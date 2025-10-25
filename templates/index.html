@@ -27,7 +27,6 @@
             flex-grow: 1; /* 폼이 남은 공간 모두 차지 */
             display: flex; /* (검색 input + 검색 버튼) 가로 배치 */
             gap: 10px;
-            /* style="display: contents;" 속성 제거됨 */
         }
         .search-bar input[type="text"] {
             flex-grow: 1; /* input이 폼 안에서 남은 공간 차지 */
@@ -35,7 +34,8 @@
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 1em;
-            min-width: 50px; /* input이 너무 얇아지지 않게 */
+            /* (*** 1. 요청 사항 수정: 모바일 오버플로우 방지 ***) */
+            min-width: 0; /* flex 아이템이 0까지 줄어들도록 허용 */
         }
         .search-bar button {
             padding: 0 20px;
@@ -49,14 +49,12 @@
             flex-shrink: 0; /* 버튼 안줄어들게 */
         }
         
-        /* (*** 1. 요청 사항 수정: 버튼 크기 동일하게 ***) */
         #start-voice-search-btn {
-            /* padding: 0 12px; */ /* (기존) */
-            /* font-size: 1.2em; */ /* (기존) */
-            padding: 0 20px;     /* (수정) .search-bar button과 동일하게 */
-            font-size: 1em;        /* (수정) .search-bar button과 동일하게 */
+            padding: 0 20px;
+            font-size: 1em;
             background-color: #6f42c1; /* 보라색 */
             flex-shrink: 0; /* 음성 버튼 줄어들지 않게 */
+            /* (참고) 높이는 .search-bar button과 자동으로 동일하게 맞춰집니다. */
         }
         #start-voice-search-btn:disabled { background-color: #ccc; }
 
@@ -192,12 +190,9 @@
             function showActiveButtons() { stopBtn.style.display = 'inline-block'; barcodeReadBtn.style.display = 'inline-block'; partNumberOcrBtn.style.display = 'inline-block'; startBtn.style.display = 'none'; }
             function showStartButton() { stopBtn.style.display = 'none'; barcodeReadBtn.style.display = 'none'; partNumberOcrBtn.style.display = 'none'; startBtn.style.display = 'inline-block'; isScanning = false; }
             
-            // (*** 1. 수정: 버튼 재활성화 함수 (텍스트 설정 제거) ***)
             function reEnableButtons() {
                 barcodeReadBtn.disabled = false;
                 partNumberOcrBtn.disabled = false;
-                // statusEl.textContent = "카메라 켜짐. 다시 시도하세요."; // <-- 덮어쓰기 삭제
-                // statusEl.className = 'scanner-status'; // <-- 덮어쓰기 삭제
             }
             
             async function stopScan() { if (!isScanning) return; statusEl.textContent = "스캔 중지 중..."; isScanning = false; partNumberOcrBtn.disabled = false; barcodeReadBtn.disabled = false; if (stream) { stream.getTracks().forEach(track => track.stop()); stream = null; console.log("Camera stream stopped."); } videoEl.srcObject = null; hideVideoAndGuide(); showStartButton(); statusEl.textContent = "스캔이 중지되었습니다."; statusEl.className = 'scanner-status'; }
@@ -218,20 +213,19 @@
                     const decodedText = await photoQrCode.scanFile(imageFile, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] } );
                     handleBarcodeSuccess(decodedText); // 성공 시 서버 전송
                 } catch (err) {
-                    /* (*** 2. 요청 사항 수정: 바코드 실패 시 메시지 변경 ***) */
+                    /* (*** 2. 요청 사항: 바코드 실패 시 메시지 변경 ***) */
                     statusEl.textContent = '바코드를 리딩 하지 못하였습니다';
                     statusEl.className = 'scanner-status error';
                     console.error("Barcode reading failed:", err);
-                    reEnableButtons(); // (*** 1. 수정: 실패 시 버튼 복구 ***)
+                    reEnableButtons(); // (실패 시 버튼 복구)
                 }
-                // (*** 1. 수정: finally 블록 삭제 ***)
             }
 
             // 바코드 성공 시 서버 전송 (페이지 이동)
             function handleBarcodeSuccess(decodedText) {
                 console.log(`바코드 성공: ${decodedText}`);
-                statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`; // (피드백)
-                statusEl.className = 'scanner-status loading'; // 로딩 중으로 변경
+                statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`;
+                statusEl.className = 'scanner-status loading';
                 fetch("{{ url_for('barcode_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText }) })
                 .then(response => response.json())
                 .then(data => {
@@ -240,14 +234,14 @@
                         if (stream) stream.getTracks().forEach(track => track.stop()); // 성공 시 카메라 중지
                         window.location.href = `/product/${data.product_number}`;
                     } else {
-                        statusEl.textContent = `바코드 오류: ${data.message}`; // (피드백)
+                        statusEl.textContent = `바코드 오류: ${data.message}`;
                         statusEl.className = 'scanner-status error';
-                        reEnableButtons(); // (*** 1. 수정: DB 실패 시 버튼 복구 ***)
+                        reEnableButtons(); // (DB 실패 시 버튼 복구)
                     }
                 })
                 .catch(error => {
                     console.error('바코드 API 오류:', error); statusEl.textContent = '서버 통신 오류 (바코드)'; statusEl.className = 'scanner-status error';
-                    reEnableButtons(); // (*** 1. 수정: 통신 실패 시 버튼 복구 ***)
+                    reEnableButtons(); // (통신 실패 시 버튼 복구)
                 });
             }
 
@@ -264,11 +258,10 @@
                         statusEl.textContent = "이미지 서버 전송 중..."; statusEl.className = 'scanner-status loading';
                         const formData = new FormData(); formData.append('ocr_image', blob, 'capture_crop.png');
                         
-                        /* (*** 2. 요청 사항 수정: OCR 실패 시 카메라 유지 ***) */
+                        /* (*** 2. 요청 사항: OCR 실패 시 카메라 유지 ***) */
                         try {
                             const response = await fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData });
                             const data = await response.json();
-                            // stopScan(); // <-- (수정) 여기서 스캔 중지하지 않음
                             
                             if (response.ok) {
                                 if (data.status === 'found_one') {
@@ -282,29 +275,25 @@
                                     if (stream) stream.getTracks().forEach(track => track.stop()); // 성공 시 중지
                                     window.location.href = `/?query=${encodeURIComponent(data.query)}`;
                                 } else {
-                                    // (수정) 실패 시 스캔 중지 대신, 메시지 표시 및 버튼 활성화
                                     statusEl.textContent = `품번 리딩 실패: ${data.message}`;
                                     statusEl.className = 'scanner-status error';
                                     reEnableButtons(); // 버튼만 다시 활성화
                                 }
                             } else {
-                                // (수정) 실패 시 스캔 중지 대신, 메시지 표시 및 버튼 활성화
                                 statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`;
                                 statusEl.className = 'scanner-status error';
                                 reEnableButtons(); // 버튼만 다시 활성화
                             }
                         } catch (fetchError) {
-                            // (수정) 실패 시 스캔 중지 대신, 메시지 표시 및 버튼 활성화
                             console.error('OCR 업로드/처리 오류:', fetchError);
                             statusEl.textContent = `OCR 오류: ${fetchError.message || '통신 실패'}`;
                             statusEl.className = 'scanner-status error';
-                            // stopScan(); // <-- (수정) 스캔 중지 안 함
                             reEnableButtons(); // 버튼만 다시 활성화
                         }
                     }, 'image/png');
                 } catch (captureError) {
                     console.error("캡처 오류:", captureError); statusEl.textContent = `캡처 오류: ${captureError.message}`; statusEl.className = 'scanner-status error';
-                    reEnableButtons(); // (*** 1. 수정: 캡처 실패 시 버튼 복구 ***)
+                    reEnableButtons(); // (캡처 실패 시 버튼 복구)
                 }
             }
             
@@ -318,7 +307,7 @@
                 const recognition = new SpeechRecognition();
                 recognition.lang = 'ko-KR'; recognition.interimResults = false; recognition.maxAlternatives = 1;
                 voiceSearchBtn.addEventListener('click', () => { try { recognition.start(); statusEl.textContent = "🎤 말씀하세요..."; statusEl.className = 'scanner-status loading'; voiceSearchBtn.disabled = true; voiceSearchBtn.textContent = "... 🎧"; } catch(err) { statusEl.textContent = "음성 인식을 시작할 수 없습니다."; statusEl.className = 'scanner-status error'; } });
-                recognition.onresult = (event) => { const transcript = event.results[0][0].transcript; const cleanedTranscript = transcript.trim(); statusEl.textContent = `인식된 텍스트: ${cleanedTranscript}. 검색 중...`; statusEl.className = 'scanner-status success'; searchInput.value = cleanedTranscript; searchForm.submit(); };
+                recognition.onresult = (event) => { const transcript = event.results[0][0].transcript; const cleanedTranscript = transcript.trim(); statusEl.textContent = `인식된 text: ${cleanedTranscript}. 검색 중...`; statusEl.className = 'scanner-status success'; searchInput.value = cleanedTranscript; searchForm.submit(); };
                 recognition.onend = () => { recognition.stop(); voiceSearchBtn.disabled = false; voiceSearchBtn.textContent = "🎤"; setTimeout(() => { if (!isScanning) { statusEl.textContent = "스캔 시작 버튼을 누르세요."; statusEl.className = 'scanner-status'; } }, 2000); };
                 recognition.onerror = (event) => { statusEl.textContent = `음성 인식 오류: ${event.error}`; statusEl.className = 'scanner-status error'; voiceSearchBtn.disabled = false; voiceSearchBtn.textContent = "🎤"; };
             } else { voiceSearchBtn.textContent = "X"; voiceSearchBtn.title = "이 브라우저는 음성 검색을 지원하지 않습니다."; voiceSearchBtn.disabled = true; }
