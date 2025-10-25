@@ -46,7 +46,15 @@
 
         /* 스캔 UI 스타일 */
         #qr-reader-container { position: relative; width: 100%; max-width: 600px; margin: 0 auto 15px auto; overflow: hidden; }
-        #scan-video { width: 100%; border: 1px solid #ddd; border-radius: 8px; display: block; background-color: #eee; transform: scaleX(-1); }
+        /* (*** 수정: transform: scaleX(-1) 삭제 ***) */
+        #scan-video {
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            display: block;
+            background-color: #eee;
+            /* transform: scaleX(-1); <-- 이 줄 삭제됨 */
+        }
         #scan-region-guide { position: absolute; left: 50%; top: 50%; width: 250px; height: 100px; border: 3px solid rgba(45, 139, 87, 0.8); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); transform: translate(-50%, -50%); display: none; pointer-events: none; }
         #scanner-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
         #scanner-controls button { flex-grow: 0; background-color: #2d8b57; color: white; border: none; padding: 12px 15px; cursor: pointer; border-radius: 6px; font-size: 1em; font-weight: 500; min-width: 100px; }
@@ -94,26 +102,17 @@
             <ul class="product-list">
                 {% for product in products %}
                     {% if showing_favorites %}
-                        {# 즐겨찾기 목록 아이템 #}
                         <li>
                             <a href="{{ url_for('product_detail', product_number=product.product_number) }}" class="product-item">
-                                <img src="{{ IMAGE_URL_PREFIX }}{{ product.product_number }}.jpg" alt="{{ product.product_name }}" class="item-image" onerror="this.style.visibility='hidden'">
+                                {% set image_pn = product.product_number.split(' ')[0] %}
+                                <img src="{{ IMAGE_URL_PREFIX }}{{ image_pn }}.jpg" alt="{{ product.product_name }}" class="item-image" onerror="this.style.visibility='hidden'">
                                 <div class="item-details">
                                     <div class="product-name">{{ product.product_name }}</div>
                                     <div class="product-meta">
                                         <span class="meta-item">{{ product.product_number }}</span>
-                                        {# (*** 수정: 모든 고유 컬러 나열 ***) #}
                                         {% if product.variants %}
-                                            {# 1. product.variants 에서 color 속성만 추출하여 리스트 생성 #}
-                                            {# 2. selectattr('color') 로 color 속성 선택, reject('none') 으로 None 값 제외 (선택 사항) #}
-                                            {# 3. unique 로 중복 제거, sort 로 정렬 (선택 사항) #}
-                                            {# 4. join(', ') 으로 콤마+공백 구분자로 합치기 #}
                                             {% set colors = product.variants | map(attribute='color') | unique | sort | join(', ') %}
-                                            {% if colors %}
-                                            <span class="meta-item">{{ colors }}</span>
-                                            {% endif %}
-
-                                            {# 첫 번째 variant 가격 정보 표시 (기존 유지) #}
+                                            {% if colors %} <span class="meta-item">{{ colors }}</span> {% endif %}
                                             {% set first_variant = product.variants[0] %}
                                             <span class="meta-item sale-price">{{ "{:,d}".format(first_variant.sale_price) }}</span>
                                             {% if first_variant.original_price and first_variant.original_price > 0 %}
@@ -127,7 +126,6 @@
                             </a>
                         </li>
                     {% else %}
-                        {# 검색 결과 아이템 (기존 방식) #}
                         <li class="search-result-item">
                             <a href="{{ url_for('product_detail', product_number=product.product_number) }}">
                                 <div class="product-name">{{ product.product_name }}</div>
@@ -136,7 +134,6 @@
                         </li>
                     {% endif %}
                 {% else %}
-                    {# 결과 없음 메시지 #}
                     {% if showing_favorites %} <li style="text-align: center; padding: 20px; color: #555;">즐겨찾기된 상품이 없습니다.</li>
                     {% else %} <li style="text-align: center; padding: 20px; color: #555;">검색된 상품이 없습니다.</li> {% endif %}
                 {% endfor %}
@@ -159,7 +156,7 @@
             function showStartButton() { stopBtn.style.display = 'none'; barcodeReadBtn.style.display = 'none'; partNumberOcrBtn.style.display = 'none'; startBtn.style.display = 'inline-block'; isScanning = false; }
             async function stopScan() { if (!isScanning) return; statusEl.textContent = "스캔 중지 중..."; isScanning = false; partNumberOcrBtn.disabled = false; barcodeReadBtn.disabled = false; if (stream) { stream.getTracks().forEach(track => track.stop()); stream = null; console.log("Camera stream stopped."); } videoEl.srcObject = null; hideVideoAndGuide(); showStartButton(); statusEl.textContent = "스캔이 중지되었습니다."; statusEl.className = 'scanner-status'; }
             async function startScan() { if (isScanning) return; await stopScan(); statusEl.textContent = "카메라 켜는 중..."; statusEl.className = 'scanner-status loading'; isScanning = true; try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); videoEl.srcObject = stream; videoEl.play(); showVideoAndGuide(); statusEl.textContent = "카메라 켜짐. 원하는 리딩 버튼을 누르세요."; statusEl.className = 'scanner-status'; showActiveButtons(); } catch (err) { statusEl.textContent = `카메라 시작 불가: ${err.message || err}`; statusEl.className = 'scanner-status error'; hideVideoAndGuide(); showStartButton(); isScanning = false; console.error("Error starting camera:", err); } }
-            async function captureAndReadBarcode() { if (!isScanning || !videoEl.srcObject) { statusEl.textContent = "먼저 스캔을 시작해주세요."; statusEl.className = 'scanner-status error'; return; } statusEl.textContent = "바코드 분석 중..."; statusEl.className = 'scanner-status loading'; barcodeReadBtn.disabled = true; try { const canvas = document.createElement('canvas'); canvas.width = videoEl.videoWidth; canvas.height = videoEl.videoHeight; const context = canvas.getContext('2d'); context.drawImage(videoEl, 0, 0, canvas.width, canvas.height); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png')); if (!blob) { throw new Error("이미지 Blob 변환 실패."); } if (!photoQrCode) { photoQrCode = new Html5Qrcode("scanner-section"); } const decodedText = await photoQrCode.scanFile(blob, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] } ); handleBarcodeSuccess(decodedText); } catch (err) { statusEl.textContent = `바코드 인식 실패: ${err.message || err}`; statusEl.className = 'scanner-status error'; console.error("Barcode reading failed:", err); } finally { barcodeReadBtn.disabled = false; } }
+            async function captureAndReadBarcode() { if (!isScanning || !videoEl.srcObject) { statusEl.textContent = "먼저 스캔을 시작해주세요."; statusEl.className = 'scanner-status error'; return; } statusEl.textContent = "바코드 분석 중..."; statusEl.className = 'scanner-status loading'; barcodeReadBtn.disabled = true; try { const canvas = document.createElement('canvas'); canvas.width = videoEl.videoWidth; canvas.height = videoEl.videoHeight; const context = canvas.getContext('2d'); context.drawImage(videoEl, 0, 0, canvas.width, canvas.height); const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png')); if (!blob) { throw new Error("이미지 Blob 변환 실패."); } const imageFile = new File([blob], "barcode_capture.png", { type: 'image/png' }); if (!photoQrCode) { photoQrCode = new Html5Qrcode("scanner-section"); } const decodedText = await photoQrCode.scanFile(imageFile, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] } ); handleBarcodeSuccess(decodedText); } catch (err) { statusEl.textContent = `바코드 인식 실패: ${err.message || err}`; statusEl.className = 'scanner-status error'; console.error("Barcode reading failed:", err); } finally { barcodeReadBtn.disabled = false; } }
             function handleBarcodeSuccess(decodedText) { console.log(`바코드 성공: ${decodedText}`); statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`; statusEl.className = 'scanner-status success'; fetch("{{ url_for('barcode_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText }) }).then(response => response.json()).then(data => { if (data.status === 'success') { statusEl.textContent = `품번(${data.product_number}) 찾음. 이동합니다.`; if (stream) stream.getTracks().forEach(track => track.stop()); window.location.href = `/product/${data.product_number}`; } else { statusEl.textContent = `바코드 오류: ${data.message}`; statusEl.className = 'scanner-status error'; showStartButton(); } }).catch(error => { console.error('바코드 API 오류:', error); statusEl.textContent = '서버 통신 오류 (바코드)'; statusEl.className = 'scanner-status error'; showStartButton(); }); }
             async function captureFrameForOcr() { if (!isScanning || !videoEl.srcObject || !videoEl.videoWidth || !videoEl.videoHeight) { statusEl.textContent = "비디오 준비 안됨."; statusEl.className = 'scanner-status error'; return; } statusEl.textContent = "가이드 영역 캡처 및 OCR 처리 중..."; statusEl.className = 'scanner-status loading'; partNumberOcrBtn.disabled = true; try { const vw = videoEl.videoWidth; const vh = videoEl.videoHeight; const dispW = videoEl.clientWidth; const dispH = videoEl.clientHeight; const boxW = qrboxConfig.width; const boxH = qrboxConfig.height; const scaleX = vw / dispW; const scaleY = vh / dispH; const boxClientX = (dispW - boxW) / 2; const boxClientY = (dispH - boxH) / 2; const sx = Math.max(0, boxClientX * scaleX); const sy = Math.max(0, boxClientY * scaleY); const sWidth = Math.min(vw - sx, boxW * scaleX); const sHeight = Math.min(vh - sy, boxH * scaleY); const canvas = document.createElement('canvas'); canvas.width = sWidth; canvas.height = sHeight; const context = canvas.getContext('2d'); context.drawImage(videoEl, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight); canvas.toBlob(async (blob) => { if (!blob) { throw new Error("이미지 Blob 변환 실패."); } statusEl.textContent = "이미지 서버 전송 중..."; statusEl.className = 'scanner-status loading'; const formData = new FormData(); formData.append('ocr_image', blob, 'capture_crop.png'); try { const response = await fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData }); const data = await response.json(); stopScan(); if (response.ok) { if (data.status === 'found_one') { statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; statusEl.className = 'scanner-status success'; window.location.href = `/product/${data.product_number}`; } else if (data.status === 'found_many') { statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; statusEl.className = 'scanner-status success'; window.location.href = `/?query=${encodeURIComponent(data.query)}`; } else { statusEl.textContent = `서버 OCR 오류: ${data.message}`; statusEl.className = 'scanner-status error'; showStartButton(); } } else { statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`; statusEl.className = 'scanner-status error'; showStartButton(); } } catch (fetchError) { console.error('OCR 업로드/처리 오류:', fetchError); statusEl.textContent = `OCR 오류: ${fetchError.message || '통신 실패'}`; statusEl.className = 'scanner-status error'; stopScan(); } }, 'image/png'); } catch (captureError) { console.error("캡처 오류:", captureError); statusEl.textContent = `캡처 오류: ${captureError.message}`; statusEl.className = 'scanner-status error'; partNumberOcrBtn.disabled = false; } }
             startBtn.addEventListener('click', startScan); barcodeReadBtn.addEventListener('click', captureAndReadBarcode); partNumberOcrBtn.addEventListener('click', captureFrameForOcr); stopBtn.addEventListener('click', stopScan);
