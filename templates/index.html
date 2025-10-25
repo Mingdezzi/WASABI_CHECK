@@ -21,13 +21,26 @@
         .search-bar { display: flex; gap: 10px; align-items: center; }
         .search-bar form { flex-grow: 1; display: flex; gap: 10px; }
         .search-bar input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; min-width: 0; }
-        .search-bar button { padding: 0 20px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 1em; flex-shrink: 0; }
         
-        /* (상세검색 버튼 스타일) */
+        /* (*** 1. 수정: 버튼 높이 통일 ***) */
+        .search-bar button {
+            padding: 12px 20px; /* (수정) Input과 동일한 상하 패딩(12px) 적용 */
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 1em; /* (수정) 폰트 크기 통일 */
+            flex-shrink: 0; 
+            white-space: nowrap; /* (추가) 버튼 텍스트 줄바꿈 방지 */
+        }
+        
+        /* (*** 2. 수정: 상세검색 버튼 스타일 ***) */
         .btn-advanced-search {
-            padding: 0 15px;
+            padding: 12px 15px; /* (수정) 상하 12px, 좌우 15px */
             background-color: #6c757d;
-            font-size: 0.9em;
+            /* font-size: 0.9em; <-- (제거) 폰트 크기 통일 */
         }
 
         /* (즐겨찾기/검색 결과 리스트 스타일) */
@@ -272,8 +285,8 @@
                 statusEl.textContent = "QR 코드 라이브러리 로딩 실패.";
                 statusEl.className = 'scanner-status error';
                 // 라이브러리 로드 실패 시 스캔 버튼 비활성화
-                startBarcodeBtn.disabled = true;
-                startOcrBtn.disabled = true;
+                if (startBarcodeBtn) startBarcodeBtn.disabled = true;
+                if (startOcrBtn) startOcrBtn.disabled = true;
             }
 
             // (스캔 함수들 - 변경 없음)
@@ -424,8 +437,7 @@
                 }
             }
 
-            // --- (*** 1. 오타 수정 ***) ---
-            // 'startBtn'을 'startBarcodeBtn'으로 수정했습니다.
+            // --- (오타 수정됨) ---
             if (startBarcodeBtn) startBarcodeBtn.addEventListener('click', startBarcodeScan);
             if (startOcrBtn) startOcrBtn.addEventListener('click', startOcrScan);
             if (captureOcrBtn) captureOcrBtn.addEventListener('click', captureFrameForOcr);
@@ -434,7 +446,7 @@
             // --- (상세검색 모달 JavaScript) ---
             const modal = document.getElementById('advanced-search-modal');
             
-            // 이제 이 함수들은 스크립트 오류 없이 정상적으로 정의됩니다.
+            // (*** 3. 수정: 이제 이 함수들은 정상적으로 정의됩니다 ***)
             window.openAdvancedSearch = function() {
                 if (modal) modal.style.display = 'flex';
             }
