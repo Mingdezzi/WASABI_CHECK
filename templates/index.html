@@ -20,12 +20,19 @@
         /* (검색창 UI) */
         .search-bar { display: flex; gap: 10px; align-items: center; }
         
-        /* (*** 1. 수정: form이 0까지 줄어들도록 min-width 추가 ***) */
         .search-bar form { 
             flex-grow: 1; 
             display: flex; 
             gap: 10px; 
-            min-width: 0; /* form 자체가 0까지 줄어들도록 허용 */
+            min-width: 0; 
+            align-items: center; /* (추가) 버튼과 래퍼를 수직 정렬 */
+        }
+
+        /* (*** 1. 신규: 검색창 래퍼 스타일 ***) */
+        .search-input-wrapper {
+            position: relative;
+            flex-grow: 1; /* input과 동일하게 */
+            display: flex; /* 내부 input 정렬용 */
         }
         
         .search-bar input[type="text"] { 
@@ -34,9 +41,27 @@
             border: 1px solid #ddd; 
             border-radius: 6px; 
             font-size: 1em; 
-            min-width: 0; /* input이 0까지 줄어들도록 허용 */
+            min-width: 0;
+            /* (*** 2. 수정: 리셋 버튼 공간 확보 ***) */
+            padding-right: 35px; 
         }
-        
+
+        /* (*** 3. 신규: 리셋 버튼 스타일 ***) */
+        .search-reset-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5em;
+            color: #999;
+            text-decoration: none;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .search-reset-btn:hover {
+            color: #333;
+        }
+
         /* (버튼 높이 통일) */
         .search-bar button {
             padding: 12px 20px; 
@@ -57,7 +82,7 @@
             background-color: #6c757d;
         }
 
-        /* (즐겨찾기/검색 결과 리스트 스타일) */
+        /* (즐겨찾기/검색 결과 리스트 스타일 - 이하 동일) */
         .product-list { list-style: none; padding: 0; }
         .product-list li { margin-bottom: 15px; }
         .product-item { display: flex; align-items: center; gap: 15px; padding: 12px; border: 1px solid #eee; border-radius: 6px; text-decoration: none; color: #333; transition: background-color 0.2s, box-shadow 0.2s; }
@@ -73,14 +98,10 @@
         .search-result-item a:hover { background-color: #fcfcfc; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .search-result-item .product-name { font-weight: 600; font-size: 1.1em; }
         .search-result-item .product-number { font-size: 0.9em; color: #555; margin-top: 5px; }
-
-        /* (임포트 스타일) */
         .import-section h3 { margin-top: 0; }
         .import-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .import-form input[type="file"] { flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
         .import-form button { background-color: #dc3545; color: white; border: none; padding: 12px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-
-        /* (스캔 UI 스타일) */
         #qr-reader-container { 
             position: relative; width: 100%; max-width: 600px; margin: 0 auto 15px auto; 
             overflow: hidden; height: 200px; background-color: #eee;
@@ -97,8 +118,6 @@
         #scanner-status.success { background-color: #d4edda; color: #155724; }
         #scanner-status.error { background-color: #f8d7da; color: #721c24; }
         #scanner-status.loading { background-color: #fff3cd; color: #856404; }
-
-        /* (상세검색 모달 CSS) */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.5); display: none;
@@ -155,7 +174,12 @@
             <h2>상품 검색</h2>
             <div class="search-bar">
                 <form action="/" method="GET" id="search-form">
-                    <input type="text" id="search-query-input" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="search-query-input" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}">
+                        {% if query %}
+                        <a href="{{ url_for('index') }}" class="search-reset-btn" title="검색 초기화">&times;</a>
+                        {% endif %}
+                    </div>
                     <button type="submit">검색</button>
                 </form>
                 <button type="button" class="btn-advanced-search" onclick="openAdvancedSearch()">상세조건검색</button>
