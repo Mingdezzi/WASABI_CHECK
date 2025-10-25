@@ -129,7 +129,9 @@
         <nav class="top-nav">
             <a href="{{ url_for('index') }}" class="nav-item"> 홈 </a>
             <a href="{{ url_for('all_products') }}" class="nav-item"> 전체 목록 </a>
-            <a href="#" class="nav-item active disabled"> 상세 정보 </a>
+            <a href="{{ url_for('direct_search') }}" class="nav-item active"> <!-- active 추가, disabled 제거 -->
+               상세 정보
+            </a>
         </nav>
 
         <div class="header">
@@ -226,7 +228,10 @@
             </ul>
         </div>
         {% endif %}
-    </div> <div id="advanced-search-modal" class="modal-overlay">
+    </div> <!-- .container 끝 -->
+
+    <!-- (상세검색 모달 HTML) -->
+    <div id="advanced-search-modal" class="modal-overlay">
         <div class="modal-content">
             <span class="modal-close-btn" onclick="closeAdvancedSearch()">&times;</span>
             <h3>상세 조건 검색</h3>

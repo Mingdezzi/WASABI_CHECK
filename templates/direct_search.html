@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASABI_CHECK - 상세 정보 검색</title>
+    <style>
+        /* (index.html과 동일한 기본 스타일 및 탭 메뉴 스타일) */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; padding: 24px; }
+        h1 { color: #2d8b57; margin: 0 0 24px 0; text-align: center; font-size: 2em; }
+        h2 { margin-top: 0; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .flash { padding: 15px; margin-bottom: 20px; border-radius: 8px; font-weight: 500; }
+        .flash.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .top-nav {
+            width: 100%; height: auto; background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0; display: flex;
+            justify-content: space-around; align-items: center;
+            margin-bottom: 20px; border-radius: 8px; overflow: hidden;
+        }
+        .nav-item {
+            flex: 1; text-align: center; text-decoration: none;
+            color: #6c757d; font-weight: 500; padding: 15px 0;
+            transition: color 0.2s, background-color 0.2s; border-right: 1px solid #eee;
+        }
+        .nav-item:last-child { border-right: none; }
+        .nav-item.active { color: #2d8b57; font-weight: bold; background-color: #f8f9fa; }
+        .nav-item.disabled { color: #ced4da; pointer-events: none; cursor: default; background-color: #f8f9fa; }
+
+        /* (직접 검색 폼 스타일) */
+        .direct-search-form { display: flex; gap: 10px; align-items: center; }
+        .direct-search-form input[type="text"] {
+            flex-grow: 1; padding: 12px; border: 1px solid #ddd;
+            border-radius: 6px; font-size: 1em; min-width: 0;
+        }
+        .direct-search-form button {
+            padding: 12px 20px; background-color: #007bff; color: white;
+            border: none; border-radius: 6px; cursor: pointer;
+            font-weight: 500; font-size: 1em; flex-shrink: 0; white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍣 WASABI_CHECK</h1>
+
+        <nav class="top-nav">
+            <a href="{{ url_for('index') }}" class="nav-item"> 홈 </a>
+            <a href="{{ url_for('all_products') }}" class="nav-item"> 전체 목록 </a>
+            <!-- 현재 페이지가 상세 정보 검색이므로 active -->
+            <a href="{{ url_for('direct_search') }}" class="nav-item active"> 상세 정보 </a>
+        </nav>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h2>상세 정보 바로 검색</h2>
+            <form action="{{ url_for('find_product') }}" method="POST" class="direct-search-form">
+                <input type="text" name="product_number" placeholder="상품 품번 입력..." required autofocus>
+                <button type="submit">상세 보기</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
