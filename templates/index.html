@@ -19,20 +19,22 @@
 
         /* (*** 2. 수정: 검색창 UI ***) */
         .search-bar {
-            display: flex;
+            display: flex; /* (검색 폼 + 음성 버튼) 가로 배치 */
             gap: 10px;
+            align-items: center; /* 세로 중앙 정렬 */
         }
         .search-bar form {
-            flex-grow: 1; /* 폼이 늘어나도록 */
-            display: flex; /* 폼 내부도 flex */
-            gap: 10px;     /* input과 button 사이 간격 */
+            flex-grow: 1; /* 폼이 남은 공간 모두 차지 */
+            display: flex; /* (검색 input + 검색 버튼) 가로 배치 */
+            gap: 10px;
         }
         .search-bar input[type="text"] {
-            flex-grow: 1; /* input이 폼 내부에서 늘어나도록 */
+            flex-grow: 1; /* input이 폼 안에서 남은 공간 차지 */
             padding: 12px;
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 1em;
+            min-width: 50px; /* input이 너무 얇아지지 않게 */
         }
         .search-bar button {
             padding: 0 20px;
@@ -43,13 +45,13 @@
             cursor: pointer;
             font-weight: 500;
             font-size: 1em;
-            flex-shrink: 0; /* 버튼 안줄어들게 */
+            flex-shrink: 0; /* 버튼들 줄어들지 않게 */
         }
         #start-voice-search-btn {
             padding: 0 12px; /* 아이콘 버튼 크기 */
             background-color: #6f42c1; /* 보라색 */
             font-size: 1.2em; /* 아이콘 크기 */
-            flex-shrink: 0; /* 음성 버튼은 줄어들지 않도록 */
+            flex-shrink: 0; /* 음성 버튼 줄어들지 않게 */
         }
         #start-voice-search-btn:disabled { background-color: #ccc; }
 
@@ -220,8 +222,8 @@
             // 바코드 성공 시 서버 전송 (페이지 이동)
             function handleBarcodeSuccess(decodedText) {
                 console.log(`바코드 성공: ${decodedText}`);
-                statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`;
-                statusEl.className = 'scanner-status loading';
+                statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`; // (피드백)
+                statusEl.className = 'scanner-status loading'; // 로딩 중으로 변경
                 fetch("{{ url_for('barcode_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText }) })
                 .then(response => response.json())
                 .then(data => {
