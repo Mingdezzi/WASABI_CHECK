@@ -48,10 +48,14 @@
             font-size: 1em;
             flex-shrink: 0; /* 버튼 안줄어들게 */
         }
+        
+        /* (*** 1. 요청 사항 수정: 버튼 크기 동일하게 ***) */
         #start-voice-search-btn {
-            padding: 0 12px; /* 아이콘 버튼 크기 */
+            /* padding: 0 12px; */ /* (기존) */
+            /* font-size: 1.2em; */ /* (기존) */
+            padding: 0 20px;     /* (수정) .search-bar button과 동일하게 */
+            font-size: 1em;        /* (수정) .search-bar button과 동일하게 */
             background-color: #6f42c1; /* 보라색 */
-            font-size: 1.2em; /* 아이콘 크기 */
             flex-shrink: 0; /* 음성 버튼 줄어들지 않게 */
         }
         #start-voice-search-btn:disabled { background-color: #ccc; }
@@ -214,7 +218,8 @@
                     const decodedText = await photoQrCode.scanFile(imageFile, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] } );
                     handleBarcodeSuccess(decodedText); // 성공 시 서버 전송
                 } catch (err) {
-                    statusEl.textContent = `바코드 인식 실패. (다시 시도하세요)`; // (피드백)
+                    /* (*** 2. 요청 사항 수정: 바코드 실패 시 메시지 변경 ***) */
+                    statusEl.textContent = '바코드를 리딩 하지 못하였습니다';
                     statusEl.className = 'scanner-status error';
                     console.error("Barcode reading failed:", err);
                     reEnableButtons(); // (*** 1. 수정: 실패 시 버튼 복구 ***)
@@ -232,7 +237,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         statusEl.textContent = `품번(${data.product_number}) 찾음. 이동합니다.`;
-                        if (stream) stream.getTracks().forEach(track => track.stop());
+                        if (stream) stream.getTracks().forEach(track => track.stop()); // 성공 시 카메라 중지
                         window.location.href = `/product/${data.product_number}`;
                     } else {
                         statusEl.textContent = `바코드 오류: ${data.message}`; // (피드백)
@@ -258,16 +263,44 @@
                         if (!blob) { throw new Error("이미지 Blob 변환 실패."); }
                         statusEl.textContent = "이미지 서버 전송 중..."; statusEl.className = 'scanner-status loading';
                         const formData = new FormData(); formData.append('ocr_image', blob, 'capture_crop.png');
+                        
+                        /* (*** 2. 요청 사항 수정: OCR 실패 시 카메라 유지 ***) */
                         try {
                             const response = await fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData });
                             const data = await response.json();
-                            stopScan(); // OCR은 시도 후 무조건 스캔 중지
+                            // stopScan(); // <-- (수정) 여기서 스캔 중지하지 않음
+                            
                             if (response.ok) {
-                                if (data.status === 'found_one') { statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`; statusEl.className = 'scanner-status success'; window.location.href = `/product/${data.product_number}`; }
-                                else if (data.status === 'found_many') { statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`; statusEl.className = 'scanner-status success'; window.location.href = `/?query=${encodeURIComponent(data.query)}`; }
-                                else { statusEl.textContent = `서버 OCR 오류: ${data.message}`; statusEl.className = 'scanner-status error'; showStartButton(); }
-                            } else { statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`; statusEl.className = 'scanner-status error'; showStartButton(); }
-                        } catch (fetchError) { console.error('OCR 업로드/처리 오류:', fetchError); statusEl.textContent = `OCR 오류: ${fetchError.message || '통신 실패'}`; statusEl.className = 'scanner-status error'; stopScan(); }
+                                if (data.status === 'found_one') {
+                                    statusEl.textContent = `상품(${data.product_number}) 찾음. 이동합니다.`;
+                                    statusEl.className = 'scanner-status success';
+                                    if (stream) stream.getTracks().forEach(track => track.stop()); // 성공 시 중지
+                                    window.location.href = `/product/${data.product_number}`;
+                                } else if (data.status === 'found_many') {
+                                    statusEl.textContent = `"${data.query}" 포함 상품 여러 개 발견. 검색 결과로 이동합니다.`;
+                                    statusEl.className = 'scanner-status success';
+                                    if (stream) stream.getTracks().forEach(track => track.stop()); // 성공 시 중지
+                                    window.location.href = `/?query=${encodeURIComponent(data.query)}`;
+                                } else {
+                                    // (수정) 실패 시 스캔 중지 대신, 메시지 표시 및 버튼 활성화
+                                    statusEl.textContent = `품번 리딩 실패: ${data.message}`;
+                                    statusEl.className = 'scanner-status error';
+                                    reEnableButtons(); // 버튼만 다시 활성화
+                                }
+                            } else {
+                                // (수정) 실패 시 스캔 중지 대신, 메시지 표시 및 버튼 활성화
+                                statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`;
+                                statusEl.className = 'scanner-status error';
+                                reEnableButtons(); // 버튼만 다시 활성화
+                            }
+                        } catch (fetchError) {
+                            // (수정) 실패 시 스캔 중지 대신, 메시지 표시 및 버튼 활성화
+                            console.error('OCR 업로드/처리 오류:', fetchError);
+                            statusEl.textContent = `OCR 오류: ${fetchError.message || '통신 실패'}`;
+                            statusEl.className = 'scanner-status error';
+                            // stopScan(); // <-- (수정) 스캔 중지 안 함
+                            reEnableButtons(); // 버튼만 다시 활성화
+                        }
                     }, 'image/png');
                 } catch (captureError) {
                     console.error("캡처 오류:", captureError); statusEl.textContent = `캡처 오류: ${captureError.message}`; statusEl.className = 'scanner-status error';
