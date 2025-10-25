@@ -27,6 +27,7 @@
             flex-grow: 1; /* 폼이 남은 공간 모두 차지 */
             display: flex; /* (검색 input + 검색 버튼) 가로 배치 */
             gap: 10px;
+            /* style="display: contents;" 속성 제거됨 */
         }
         .search-bar input[type="text"] {
             flex-grow: 1; /* input이 폼 안에서 남은 공간 차지 */
@@ -45,7 +46,7 @@
             cursor: pointer;
             font-weight: 500;
             font-size: 1em;
-            flex-shrink: 0; /* 버튼들 줄어들지 않게 */
+            flex-shrink: 0; /* 버튼 안줄어들게 */
         }
         #start-voice-search-btn {
             padding: 0 12px; /* 아이콘 버튼 크기 */
