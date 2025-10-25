@@ -120,19 +120,20 @@ def import_excel():
 
 # --- 웹페이지 라우트 ---
 
-# (*** 1. 수정: index 함수 ***)
 @app.route('/')
 def index():
     query = request.args.get('query', ''); showing_favorites = False
     if query:
         search_term = f'%{query}%'
-        products = Product.query.filter( or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term)) ).order_by(Product.product_name).all()
+        products = Product.query.options(joinedload(Product.variants)).filter(
+            or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term))
+        ).order_by(Product.product_name).all()
     else:
-        # 검색어가 없을 때만 즐겨찾기 표시
         showing_favorites = True
-        products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.item_category, Product.product_name).all()
+        products = Product.query.options(joinedload(Product.variants)).filter(
+            Product.is_favorite == 1
+        ).order_by(Product.item_category, Product.product_name).all()
 
-    # (*** 수정: showing_all 추가 ***)
     return render_template(
         'index.html',
         products=products,
@@ -142,13 +143,10 @@ def index():
         advanced_search_params={}
     )
 
-# (*** 2. 신규: 전체 목록 라우트 추가 ***)
 @app.route('/all_products')
 def all_products():
     try:
-        # 모든 상품 조회 (variants 포함하여 로드)
         products = Product.query.options(joinedload(Product.variants)).order_by(Product.item_category, Product.product_name).all()
-
         return render_template(
             'index.html',
             products=products,
@@ -161,14 +159,11 @@ def all_products():
         flash(f"전체 목록 조회 오류: {e}", 'error')
         return redirect(url_for('index'))
 
-# (*** 3. 수정: 상세 검색 라우트 ***)
 @app.route('/advanced_search')
 def advanced_search():
     try:
-        # Base query with join
-        query = Product.query.join(Product.variants)
+        query = Product.query.options(joinedload(Product.variants)).join(Product.variants) # Join 추가
 
-        # Get all search parameters
         params = request.args
         search_active = False
         query_summary_parts = []
@@ -241,7 +236,6 @@ def advanced_search():
             products = query.distinct().order_by(Product.product_name).all()
             query_summary = f"상세 검색: {', '.join(query_summary_parts)}"
 
-        # (*** 수정: showing_all 추가 ***)
         return render_template(
             'index.html',
             products=products,
@@ -266,7 +260,6 @@ def get_sort_key(variant):
     else: sort_key = (3, 0, size_str)
     return (color, sort_key)
 
-# (*** 4. 수정: product_detail 함수 ***)
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
@@ -280,7 +273,6 @@ def product_detail(product_number):
             if len(search_term) > 1:
                 related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
 
-    # (*** 수정: showing_all 추가 ***)
     return render_template(
         'detail.html',
         product=product,
@@ -302,7 +294,6 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
-# Google Vision AI를 사용하는 /ocr_upload 함수
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if vision_client is None: return jsonify({'status': 'error', 'message': 'Google Cloud Vision 클라이언트 초기화 실패.'}), 500
