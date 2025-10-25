@@ -19,22 +19,21 @@
 
         /* (*** 2. 수정: 검색창 UI ***) */
         .search-bar {
-            display: flex; /* (검색 폼 + 음성 버튼) 가로 배치 */
+            display: flex; 
             gap: 10px;
-            align-items: center; /* 세로 중앙 정렬 */
+            align-items: center; 
         }
         .search-bar form {
-            flex-grow: 1; /* 폼이 남은 공간 모두 차지 */
-            display: flex; /* (검색 input + 검색 버튼) 가로 배치 */
+            flex-grow: 1; 
+            display: flex; 
             gap: 10px;
         }
         .search-bar input[type="text"] {
-            flex-grow: 1; /* input이 폼 안에서 남은 공간 차지 */
+            flex-grow: 1; 
             padding: 12px;
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 1em;
-            /* (*** 1. 요청 사항 수정: 모바일 오버플로우 방지 ***) */
             min-width: 0; /* flex 아이템이 0까지 줄어들도록 허용 */
         }
         .search-bar button {
@@ -49,14 +48,8 @@
             flex-shrink: 0; /* 버튼 안줄어들게 */
         }
         
-        #start-voice-search-btn {
-            padding: 0 20px;
-            font-size: 1em;
-            background-color: #6f42c1; /* 보라색 */
-            flex-shrink: 0; /* 음성 버튼 줄어들지 않게 */
-            /* (참고) 높이는 .search-bar button과 자동으로 동일하게 맞춰집니다. */
-        }
-        #start-voice-search-btn:disabled { background-color: #ccc; }
+        /* (*** 1. 요청 사항 수정: 음성 검색 버튼 CSS 삭제 ***) */
+        /* #start-voice-search-btn 관련 CSS 제거됨 */
 
         /* (즐겨찾기/검색 결과 리스트 스타일 - 이전과 동일) */
         .product-list { list-style: none; padding: 0; }
@@ -126,8 +119,7 @@
                     <input type="text" id="search-query-input" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}">
                     <button type="submit">검색</button>
                 </form>
-                <button id="start-voice-search-btn" title="음성 검색">🎤</button>
-            </div>
+                </div>
         </div>
 
         <div class="card">
@@ -213,7 +205,6 @@
                     const decodedText = await photoQrCode.scanFile(imageFile, false, { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] } );
                     handleBarcodeSuccess(decodedText); // 성공 시 서버 전송
                 } catch (err) {
-                    /* (*** 2. 요청 사항: 바코드 실패 시 메시지 변경 ***) */
                     statusEl.textContent = '바코드를 리딩 하지 못하였습니다';
                     statusEl.className = 'scanner-status error';
                     console.error("Barcode reading failed:", err);
@@ -258,7 +249,6 @@
                         statusEl.textContent = "이미지 서버 전송 중..."; statusEl.className = 'scanner-status loading';
                         const formData = new FormData(); formData.append('ocr_image', blob, 'capture_crop.png');
                         
-                        /* (*** 2. 요청 사항: OCR 실패 시 카메라 유지 ***) */
                         try {
                             const response = await fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData });
                             const data = await response.json();
@@ -297,20 +287,7 @@
                 }
             }
             
-            // --- 3. 음성 검색 ---
-            const voiceSearchBtn = document.getElementById('start-voice-search-btn');
-            const searchInput = document.getElementById('search-query-input');
-            const searchForm = document.getElementById('search-form');
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-            if (SpeechRecognition) {
-                const recognition = new SpeechRecognition();
-                recognition.lang = 'ko-KR'; recognition.interimResults = false; recognition.maxAlternatives = 1;
-                voiceSearchBtn.addEventListener('click', () => { try { recognition.start(); statusEl.textContent = "🎤 말씀하세요..."; statusEl.className = 'scanner-status loading'; voiceSearchBtn.disabled = true; voiceSearchBtn.textContent = "... 🎧"; } catch(err) { statusEl.textContent = "음성 인식을 시작할 수 없습니다."; statusEl.className = 'scanner-status error'; } });
-                recognition.onresult = (event) => { const transcript = event.results[0][0].transcript; const cleanedTranscript = transcript.trim(); statusEl.textContent = `인식된 text: ${cleanedTranscript}. 검색 중...`; statusEl.className = 'scanner-status success'; searchInput.value = cleanedTranscript; searchForm.submit(); };
-                recognition.onend = () => { recognition.stop(); voiceSearchBtn.disabled = false; voiceSearchBtn.textContent = "🎤"; setTimeout(() => { if (!isScanning) { statusEl.textContent = "스캔 시작 버튼을 누르세요."; statusEl.className = 'scanner-status'; } }, 2000); };
-                recognition.onerror = (event) => { statusEl.textContent = `음성 인식 오류: ${event.error}`; statusEl.className = 'scanner-status error'; voiceSearchBtn.disabled = false; voiceSearchBtn.textContent = "🎤"; };
-            } else { voiceSearchBtn.textContent = "X"; voiceSearchBtn.title = "이 브라우저는 음성 검색을 지원하지 않습니다."; voiceSearchBtn.disabled = true; }
+            // (*** 1. 요청 사항 수정: 음성 검색 JS 로직 전체 삭제 ***)
 
             // --- 버튼 이벤트 리스너 ---
             startBtn.addEventListener('click', startScan);
