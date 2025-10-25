@@ -55,7 +55,7 @@ else:
 def inject_image_url_prefix():
     return dict(IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
 
-# --- DB 모델 정의 (수정됨) ---
+# --- DB 모델 정의 ---
 class Product(db.Model):
     __tablename__ = 'products'
     product_number = db.Column(String, primary_key=True)
@@ -80,7 +80,7 @@ class Variant(db.Model):
 def init_db():
     with app.app_context(): db.create_all(); print("DB 테이블 초기화/검증 완료.")
 
-# --- 엑셀 임포트 (수정됨) ---
+# --- 엑셀 임포트 ---
 @app.route('/import_excel', methods=['GET', 'POST'])
 def import_excel():
     if request.method == 'POST':
@@ -128,25 +128,46 @@ def index():
         search_term = f'%{query}%'
         products = Product.query.filter( or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term)) ).order_by(Product.product_name).all()
     else:
+        # 검색어가 없을 때만 즐겨찾기 표시
         showing_favorites = True
         products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.item_category, Product.product_name).all()
-    
-    # (*** 수정: advanced_search_params 추가 ***)
+
+    # (*** 수정: showing_all 추가 ***)
     return render_template(
-        'index.html', 
-        products=products, 
-        query=query, 
-        showing_favorites=showing_favorites, 
-        advanced_search_params={} # 일반 접속 시 빈 딕셔너리 전달
+        'index.html',
+        products=products,
+        query=query,
+        showing_favorites=showing_favorites,
+        showing_all=False, # 홈 또는 검색 결과는 '전체 목록'이 아님
+        advanced_search_params={}
     )
 
-# (*** 2. 신규: 상세 검색 라우트 추가 ***)
+# (*** 2. 신규: 전체 목록 라우트 추가 ***)
+@app.route('/all_products')
+def all_products():
+    try:
+        # 모든 상품 조회 (variants 포함하여 로드)
+        products = Product.query.options(joinedload(Product.variants)).order_by(Product.item_category, Product.product_name).all()
+
+        return render_template(
+            'index.html',
+            products=products,
+            query="전체 목록", # 페이지 상단에 표시될 제목
+            showing_favorites=False, # 즐겨찾기 목록 아님
+            showing_all=True,      # '전체 목록' 탭 활성화용
+            advanced_search_params={}
+        )
+    except Exception as e:
+        flash(f"전체 목록 조회 오류: {e}", 'error')
+        return redirect(url_for('index'))
+
+# (*** 3. 수정: 상세 검색 라우트 ***)
 @app.route('/advanced_search')
 def advanced_search():
     try:
         # Base query with join
         query = Product.query.join(Product.variants)
-        
+
         # Get all search parameters
         params = request.args
         search_active = False
@@ -157,75 +178,62 @@ def advanced_search():
             value = params.get('product_number')
             query = query.filter(Product.product_number.ilike(f"%{value}%"))
             search_active = True; query_summary_parts.append(f"품번: {value}")
-
         if params.get('product_name'):
             value = params.get('product_name')
             query = query.filter(Product.product_name.ilike(f"%{value}%"))
             search_active = True; query_summary_parts.append(f"품명: {value}")
-
         if params.get('color'):
             value = params.get('color')
             query = query.filter(Variant.color.ilike(f"%{value}%"))
             search_active = True; query_summary_parts.append(f"색상: {value}")
-
         if params.get('size'):
             value = params.get('size')
             query = query.filter(Variant.size.ilike(f"%{value}%"))
             search_active = True; query_summary_parts.append(f"사이즈: {value}")
-        
         if params.get('release_year'):
             try:
                 year = int(params.get('release_year'))
                 query = query.filter(Product.release_year == year)
                 search_active = True; query_summary_parts.append(f"년도: {year}")
-            except ValueError: pass 
-
+            except ValueError: pass
         if params.get('item_category'):
             value = params.get('item_category')
             query = query.filter(Product.item_category.ilike(f"%{value}%"))
             search_active = True; query_summary_parts.append(f"품목: {value}")
-        
-        # Price filters
         if params.get('original_price_min'):
             try:
                 value = int(params.get('original_price_min'))
                 query = query.filter(Variant.original_price >= value)
                 search_active = True; query_summary_parts.append(f"최초가(min): {value}")
             except ValueError: pass
-        
         if params.get('original_price_max'):
             try:
                 value = int(params.get('original_price_max'))
                 query = query.filter(Variant.original_price <= value)
                 search_active = True; query_summary_parts.append(f"최초가(max): {value}")
             except ValueError: pass
-
         if params.get('sale_price_min'):
             try:
                 value = int(params.get('sale_price_min'))
                 query = query.filter(Variant.sale_price >= value)
                 search_active = True; query_summary_parts.append(f"판매가(min): {value}")
             except ValueError: pass
-        
         if params.get('sale_price_max'):
             try:
                 value = int(params.get('sale_price_max'))
                 query = query.filter(Variant.sale_price <= value)
                 search_active = True; query_summary_parts.append(f"판매가(max): {value}")
             except ValueError: pass
-
-        # Discount filter
         if params.get('min_discount'):
             try:
                 min_discount_percent = int(params.get('min_discount'))
                 if min_discount_percent > 0:
                     ratio = 1.0 - (min_discount_percent / 100.0)
-                    query = query.filter(Variant.original_price > 0) 
+                    query = query.filter(Variant.original_price > 0)
                     query = query.filter(Variant.sale_price <= (Variant.original_price * ratio))
                     search_active = True; query_summary_parts.append(f"할인율: {min_discount_percent}% 이상")
             except ValueError: pass
 
-        # If no search params, just return an empty list
         if not search_active:
             products = []
             query_summary = "상세 검색: 조건 없음"
@@ -233,14 +241,15 @@ def advanced_search():
             products = query.distinct().order_by(Product.product_name).all()
             query_summary = f"상세 검색: {', '.join(query_summary_parts)}"
 
+        # (*** 수정: showing_all 추가 ***)
         return render_template(
-            'index.html', 
-            products=products, 
-            query=query_summary, 
+            'index.html',
+            products=products,
+            query=query_summary,
             showing_favorites=False,
-            advanced_search_params=params # Pass params back to re-fill form
+            showing_all=False, # 상세 검색 결과는 '전체 목록'이 아님
+            advanced_search_params=params
         )
-    
     except Exception as e:
         flash(f"검색 오류: {e}", 'error')
         return redirect(url_for('index'))
@@ -257,7 +266,7 @@ def get_sort_key(variant):
     else: sort_key = (3, 0, size_str)
     return (color, sort_key)
 
-# (*** 3. 수정: product_detail 함수 ***)
+# (*** 4. 수정: product_detail 함수 ***)
 @app.route('/product/<product_number>')
 def product_detail(product_number):
     product = Product.query.get(product_number)
@@ -270,15 +279,16 @@ def product_detail(product_number):
             search_term = search_words[-1]
             if len(search_term) > 1:
                 related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
-    
-    # (*** 수정: advanced_search_params 추가 ***)
-    return render_template( 
-        'detail.html', 
-        product=product, 
-        image_url=image_url, 
-        variants=variants_list, 
+
+    # (*** 수정: showing_all 추가 ***)
+    return render_template(
+        'detail.html',
+        product=product,
+        image_url=image_url,
+        variants=variants_list,
         related_products=related_products,
-        advanced_search_params={} # 일반 접속 시 빈 딕셔너리 전달
+        showing_all=False, # 상세 페이지는 '전체 목록'이 아님
+        advanced_search_params={}
     )
 
 # --- API 라우트 ---
@@ -324,7 +334,7 @@ def ocr_upload():
 @app.route('/text_search', methods=['POST'])
 def text_search():
     data = request.json
-    text_raw = data.get('text', '').strip() 
+    text_raw = data.get('text', '').strip()
     if not text_raw:
         return jsonify({'status': 'error', 'message': '검색할 텍스트가 없습니다.'}), 400
     search_term_asis = f'%{text_raw}%'
@@ -332,8 +342,8 @@ def text_search():
     search_term_cleaned = f'%{text_cleaned}%'
     results = Product.query.filter(
         or_(
-            Product.product_name.ilike(search_term_asis), 
-            Product.product_number.ilike(search_term_asis), 
+            Product.product_name.ilike(search_term_asis),
+            Product.product_number.ilike(search_term_asis),
             Product.product_number.ilike(search_term_cleaned)
         )
     ).all()
