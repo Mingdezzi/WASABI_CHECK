@@ -8,7 +8,12 @@
 
     <style>
         /* (기본 스타일) */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px; /* 하단 여백 제거 */
+            background-color: #f0f2f5;
+        }
         .container { max-width: 800px; margin: 0 auto; }
         .card { background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; padding: 24px; }
         h1 { color: #2d8b57; margin: 0 0 24px 0; text-align: center; font-size: 2em; }
@@ -19,34 +24,27 @@
 
         /* (검색창 UI) */
         .search-bar { display: flex; gap: 10px; align-items: center; }
-        
-        .search-bar form { 
-            flex-grow: 1; 
-            display: flex; 
-            gap: 10px; 
-            min-width: 0; 
-            align-items: center; /* (추가) 버튼과 래퍼를 수직 정렬 */
+        .search-bar form {
+            flex-grow: 1;
+            display: flex;
+            gap: 10px;
+            min-width: 0; /* form 자체가 0까지 줄어들도록 허용 */
+            align-items: center; /* 버튼과 래퍼를 수직 정렬 */
         }
-
-        /* (*** 1. 신규: 검색창 래퍼 스타일 ***) */
         .search-input-wrapper {
             position: relative;
             flex-grow: 1; /* input과 동일하게 */
             display: flex; /* 내부 input 정렬용 */
         }
-        
-        .search-bar input[type="text"] { 
-            flex-grow: 1; 
-            padding: 12px; 
-            border: 1px solid #ddd; 
-            border-radius: 6px; 
-            font-size: 1em; 
+        .search-bar input[type="text"] {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
             min-width: 0;
-            /* (*** 2. 수정: 리셋 버튼 공간 확보 ***) */
-            padding-right: 35px; 
+            padding-right: 35px; /* 리셋 버튼 공간 확보 */
         }
-
-        /* (*** 3. 신규: 리셋 버튼 스타일 ***) */
         .search-reset-btn {
             position: absolute;
             right: 10px;
@@ -58,31 +56,22 @@
             font-weight: bold;
             line-height: 1;
         }
-        .search-reset-btn:hover {
-            color: #333;
-        }
-
-        /* (버튼 높이 통일) */
+        .search-reset-btn:hover { color: #333; }
         .search-bar button {
-            padding: 12px 20px; 
+            padding: 12px 20px;
             background-color: #007bff;
             color: white;
             border: none;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 500;
-            font-size: 1em; 
-            flex-shrink: 0; 
-            white-space: nowrap; 
+            font-size: 1em;
+            flex-shrink: 0;
+            white-space: nowrap;
         }
-        
-        /* (상세검색 버튼 스타일) */
-        .btn-advanced-search {
-            padding: 12px 15px; 
-            background-color: #6c757d;
-        }
+        .btn-advanced-search { padding: 12px 15px; background-color: #6c757d; }
 
-        /* (즐겨찾기/검색 결과 리스트 스타일 - 이하 동일) */
+        /* (즐겨찾기/검색 결과 리스트 스타일) */
         .product-list { list-style: none; padding: 0; }
         .product-list li { margin-bottom: 15px; }
         .product-item { display: flex; align-items: center; gap: 15px; padding: 12px; border: 1px solid #eee; border-radius: 6px; text-decoration: none; color: #333; transition: background-color 0.2s, box-shadow 0.2s; }
@@ -98,12 +87,16 @@
         .search-result-item a:hover { background-color: #fcfcfc; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .search-result-item .product-name { font-weight: 600; font-size: 1.1em; }
         .search-result-item .product-number { font-size: 0.9em; color: #555; margin-top: 5px; }
+
+        /* (임포트 스타일) */
         .import-section h3 { margin-top: 0; }
         .import-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .import-form input[type="file"] { flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
         .import-form button { background-color: #dc3545; color: white; border: none; padding: 12px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        #qr-reader-container { 
-            position: relative; width: 100%; max-width: 600px; margin: 0 auto 15px auto; 
+
+        /* (스캔 UI 스타일) */
+        #qr-reader-container {
+            position: relative; width: 100%; max-width: 600px; margin: 0 auto 15px auto;
             overflow: hidden; height: 200px; background-color: #eee;
             border-radius: 8px; border: 1px solid #ddd;
         }
@@ -118,6 +111,8 @@
         #scanner-status.success { background-color: #d4edda; color: #155724; }
         #scanner-status.error { background-color: #f8d7da; color: #721c24; }
         #scanner-status.loading { background-color: #fff3cd; color: #856404; }
+
+        /* (상세검색 모달 CSS) */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.5); display: none;
@@ -137,7 +132,7 @@
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em; }
         .form-group input {
             width: 100%; padding: 8px; border: 1px solid #ddd;
-            border-radius: 6px; box-sizing: border-box; 
+            border-radius: 6px; box-sizing: border-box;
         }
         .form-row { display: flex; gap: 10px; }
         .form-row .form-group { flex: 1; }
@@ -148,11 +143,53 @@
         }
         .modal-actions button[type="submit"] { background-color: #007bff; color: white; }
         .modal-actions button[type="reset"] { background-color: #f0f2f5; color: #333; }
+
+        /* (상단 탭 메뉴 CSS) */
+        .top-nav {
+            width: 100%;
+            height: auto;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            text-decoration: none;
+            color: #6c757d;
+            font-weight: 500;
+            padding: 15px 0;
+            transition: color 0.2s, background-color 0.2s;
+            border-right: 1px solid #eee;
+        }
+        .nav-item:last-child { border-right: none; }
+        .nav-item.active { color: #2d8b57; font-weight: bold; background-color: #f8f9fa; }
+        .nav-item.disabled { color: #ced4da; pointer-events: none; cursor: default; background-color: #f8f9fa; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🍣 WASABI_CHECK</h1>
+
+        <nav class="top-nav">
+            <a href="{{ url_for('index') }}"
+               class="nav-item {{ 'active' if showing_favorites else '' }}">
+               홈
+            </a>
+            <a href="{{ url_for('all_products') }}"
+               class="nav-item {{ 'active' if showing_all else '' }}">
+               전체 목록
+            </a>
+            <a href="#"
+               class="nav-item disabled">
+               상세 정보
+            </a>
+        </nav>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %} {% for category, message in messages %} <div class="flash {{ category }}">{{ message }}</div> {% endfor %} {% endif %}
@@ -246,7 +283,6 @@
                     <label for="adv-product-number">품번</label>
                     <input type="text" id="adv-product-number" name="product_number" value="{{ advanced_search_params.get('product_number', '') }}">
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-color">색상</label>
@@ -257,7 +293,6 @@
                         <input type="text" id="adv-size" name="size" value="{{ advanced_search_params.get('size', '') }}">
                     </div>
                 </div>
-
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-release-year">출시년도</label>
@@ -268,7 +303,6 @@
                         <input type="text" id="adv-item-category" name="item_category" value="{{ advanced_search_params.get('item_category', '') }}">
                     </div>
                 </div>
-
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-sale-price-min">판매가 (최소)</label>
@@ -279,7 +313,6 @@
                         <input type="number" id="adv-sale-price-max" name="sale_price_max" placeholder="999999" value="{{ advanced_search_params.get('sale_price_max', '') }}">
                     </div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-original-price-min">최초가 (최소)</label>
@@ -290,12 +323,10 @@
                         <input type="number" id="adv-original-price-max" name="original_price_max" placeholder="999999" value="{{ advanced_search_params.get('original_price_max', '') }}">
                     </div>
                 </div>
-
                 <div class="form-group">
                     <label for="adv-min-discount">최소 할인율 (%)</label>
                     <input type="number" id="adv-min-discount" name="min_discount" placeholder="예: 30 (30% 이상)" value="{{ advanced_search_params.get('min_discount', '') }}">
                 </div>
-
                 <div class="modal-actions">
                     <button type="reset" onclick="this.form.reset();">초기화</button>
                     <button type="submit">검색</button>
@@ -315,8 +346,8 @@
             let html5QrCode = null;
 
             try {
-                html5QrCode = new Html5Qrcode("qr-reader-container", { 
-                    formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] 
+                html5QrCode = new Html5Qrcode("qr-reader-container", {
+                    formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ]
                 });
             } catch (e) {
                 console.error("Html5Qrcode 라이브러리 초기화 실패.", e);
@@ -343,7 +374,7 @@
                 }).catch(err => {
                     statusEl.textContent = `카메라 시작 불가: ${err}`;
                     statusEl.className = 'scanner-status error';
-                    stopScan(); 
+                    stopScan();
                 });
             }
             function startOcrScan() {
@@ -362,7 +393,7 @@
                 }).catch(err => {
                     statusEl.textContent = `카메라 시작 불가: ${err}`;
                     statusEl.className = 'scanner-status error';
-                    stopScan(); 
+                    stopScan();
                 });
             }
             function stopScan() {
@@ -380,7 +411,7 @@
                         stopBtn.style.display = 'none';
                         statusEl.textContent = "스캔이 중지되었습니다.";
                         statusEl.className = 'scanner-status';
-                        qrReaderContainer.innerHTML = ''; 
+                        qrReaderContainer.innerHTML = '';
                     });
                 } catch (e) {
                     console.error("Error stopping scanner:", e);
@@ -395,7 +426,7 @@
             }
             function handleBarcodeSuccess(decodedText, decodedResult) {
                 if (!html5QrCode) return;
-                html5QrCode.pause(true); 
+                html5QrCode.pause(true);
                 statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`;
                 statusEl.className = 'scanner-status loading';
                 fetch("{{ url_for('barcode_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText }) })
@@ -403,7 +434,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         statusEl.textContent = `품번(${data.product_number}) 찾음. 이동합니다.`;
-                        stopScan(); 
+                        stopScan();
                         window.location.href = `/product/${data.product_number}`;
                     } else {
                         statusEl.textContent = `바코드 오류: ${data.message}. 다시 스캔하세요.`;
@@ -412,18 +443,18 @@
                     }
                 })
                 .catch(error => {
-                    console.error('바코드 API 오류:', error); 
-                    statusEl.textContent = '서버 통신 오류. 다시 스캔하세요.'; 
+                    console.error('바코드 API 오류:', error);
+                    statusEl.textContent = '서버 통신 오류. 다시 스캔하세요.';
                     statusEl.className = 'scanner-status error';
                     html5QrCode.resume();
                 });
             }
             async function captureFrameForOcr() {
                 const videoEl = document.querySelector("#qr-reader-container video");
-                if (!videoEl || !videoEl.videoWidth || !videoEl.videoHeight) { 
-                    statusEl.textContent = "비디오 준비 안됨. 다시 시도하세요."; 
-                    statusEl.className = 'scanner-status error'; 
-                    return; 
+                if (!videoEl || !videoEl.videoWidth || !videoEl.videoHeight) {
+                    statusEl.textContent = "비디오 준비 안됨. 다시 시도하세요.";
+                    statusEl.className = 'scanner-status error';
+                    return;
                 }
                 statusEl.textContent = "화면 캡처 및 OCR 처리 중...";
                 statusEl.className = 'scanner-status loading';
@@ -443,7 +474,7 @@
                                 if (data.status === 'found_one' || data.status === 'found_many') {
                                     statusEl.textContent = `상품 찾음. 이동합니다.`;
                                     statusEl.className = 'scanner-status success';
-                                    stopScan(); 
+                                    stopScan();
                                     if (data.status === 'found_one') {
                                         window.location.href = `/product/${data.product_number}`;
                                     } else {
@@ -467,8 +498,8 @@
                         }
                     }, 'image/png');
                 } catch (captureError) {
-                    console.error("캡처 오류:", captureError); 
-                    statusEl.textContent = `캡처 오류: ${captureError.message}`; 
+                    console.error("캡처 오류:", captureError);
+                    statusEl.textContent = `캡처 오류: ${captureError.message}`;
                     statusEl.className = 'scanner-status error';
                     captureOcrBtn.disabled = false;
                 }
@@ -482,21 +513,9 @@
 
             // --- (상세검색 모달 JavaScript) ---
             const modal = document.getElementById('advanced-search-modal');
-            
-            window.openAdvancedSearch = function() {
-                if (modal) modal.style.display = 'flex';
-            }
-            window.closeAdvancedSearch = function() {
-                if (modal) modal.style.display = 'none';
-            }
-            
-            if (modal) {
-                modal.addEventListener('click', function(e) {
-                    if (e.target === modal) {
-                        closeAdvancedSearch();
-                    }
-                });
-            }
+            window.openAdvancedSearch = function() { if (modal) modal.style.display = 'flex'; }
+            window.closeAdvancedSearch = function() { if (modal) modal.style.display = 'none'; }
+            if (modal) { modal.addEventListener('click', function(e) { if (e.target === modal) { closeAdvancedSearch(); } }); }
         });
     </script>
 </body>

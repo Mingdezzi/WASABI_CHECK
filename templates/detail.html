@@ -5,38 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ product.product_name }} - WASABI_CHECK</title>
     <style>
-        /* (스타일 약간 조정) */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
+        /* (기본 스타일) */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px; /* 하단 여백 제거 */
+            background-color: #f0f2f5;
+        }
         .container { max-width: 900px; margin: 0 auto; background-color: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        
-        /* (*** 1. 수정: 헤더 스타일 ***) */
-        .header { 
-            margin-bottom: 20px; 
-            display: flex; /* 가로 배치 */
-            justify-content: space-between; /* 양 끝 정렬 */
-            align-items: center; /* 세로 중앙 정렬 */
-            flex-wrap: wrap; /* 창이 좁으면 줄바꿈 */
-            gap: 10px;
+
+        /* (헤더 스타일) */
+        .header {
+            margin-bottom: 20px; display: flex; justify-content: space-between;
+            align-items: center; flex-wrap: wrap; gap: 10px;
         }
-        .header .header-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .header .header-left { display: flex; align-items: center; gap: 10px; }
         .header .back-link { text-decoration: none; color: #007bff; font-weight: 500; display: inline-block; }
-        /* (*** 2. 신규: 상세검색 버튼 스타일 ***) */
         .header .btn-advanced-search {
-            padding: 8px 12px;
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 0.9em;
-            flex-shrink: 0;
+            padding: 8px 12px; background-color: #6c757d; color: white; border: none;
+            border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9em; flex-shrink: 0;
         }
-        .search-bar { display: flex; gap: 10px; width: 100%; /* 헤더가 2줄이 될 때 검색창은 꽉 차게 */ }
+        .search-bar { display: flex; gap: 10px; width: 100%; }
         .search-bar input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95em; }
         .search-bar button { padding: 0 15px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.95em; }
         hr { border: none; border-top: 1px solid #eee; margin: 24px 0; }
@@ -85,7 +74,7 @@
         .related-list .product-name { font-weight: 600; }
         .related-list .product-number { font-size: 0.9em; color: #555; margin-top: 5px; }
 
-        /* (*** 3. 신규: 상세검색 모달 CSS ***) */
+        /* (상세검색 모달 CSS) */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.5); display: none;
@@ -105,7 +94,7 @@
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em; }
         .form-group input {
             width: 100%; padding: 8px; border: 1px solid #ddd;
-            border-radius: 6px; box-sizing: border-box; /* 100% width용 */
+            border-radius: 6px; box-sizing: border-box;
         }
         .form-row { display: flex; gap: 10px; }
         .form-row .form-group { flex: 1; }
@@ -116,17 +105,38 @@
         }
         .modal-actions button[type="submit"] { background-color: #007bff; color: white; }
         .modal-actions button[type="reset"] { background-color: #f0f2f5; color: #333; }
+
+        /* (상단 탭 메뉴 CSS) */
+        .top-nav {
+            width: 100%; height: auto; background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0; display: flex;
+            justify-content: space-around; align-items: center;
+            margin-bottom: 20px; border-radius: 8px; overflow: hidden;
+        }
+        .nav-item {
+            flex: 1; text-align: center; text-decoration: none;
+            color: #6c757d; font-weight: 500; padding: 15px 0;
+            transition: color 0.2s, background-color 0.2s; border-right: 1px solid #eee;
+        }
+        .nav-item:last-child { border-right: none; }
+        .nav-item.active { color: #2d8b57; font-weight: bold; background-color: #f8f9fa; }
+        .nav-item.disabled { color: #ced4da; pointer-events: none; cursor: default; background-color: #f8f9fa; }
     </style>
 </head>
 <body>
     <div class="container">
+
+        <nav class="top-nav">
+            <a href="{{ url_for('index') }}" class="nav-item"> 홈 </a>
+            <a href="{{ url_for('all_products') }}" class="nav-item"> 전체 목록 </a>
+            <a href="#" class="nav-item active disabled"> 상세 정보 </a>
+        </nav>
 
         <div class="header">
             <div class="header-left">
                 <a href="{{ url_for('index') }}" class="back-link">&larr; 돌아가기</a>
                 <button type="button" class="btn-advanced-search" onclick="openAdvancedSearch()">상세조건검색</button>
             </div>
-            
             <div class="search-bar">
                 <form action="/" method="GET" style="display: contents;">
                     <input type="text" name="query" placeholder="다른 상품 검색..." value="">
@@ -134,7 +144,7 @@
                 </form>
             </div>
         </div>
-        <hr> 
+        <hr>
 
         <div class="product-info">
             <div class="product-details">
@@ -169,7 +179,7 @@
             <img src="{{ image_url }}" alt="{{ product.product_name }} 이미지" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
             <p class="error-text">(이미지를 불러올 수 없습니다.)</p>
         </div>
-        <hr> 
+        <hr>
 
         <div class="stock-section">
             <h2>재고 현황</h2>
@@ -206,7 +216,7 @@
                 </table>
             </div>
         </div>
-        <hr> 
+        <hr>
 
         {% if related_products %}
         <div class="related-container">
@@ -221,7 +231,7 @@
             <span class="modal-close-btn" onclick="closeAdvancedSearch()">&times;</span>
             <h3>상세 조건 검색</h3>
             <form action="{{ url_for('advanced_search') }}" method="GET">
-                <div class="form-group">
+                 <div class="form-group">
                     <label for="adv-product-name">품명</label>
                     <input type="text" id="adv-product-name" name="product_name" value="{{ advanced_search_params.get('product_name', '') }}">
                 </div>
@@ -229,7 +239,6 @@
                     <label for="adv-product-number">품번</label>
                     <input type="text" id="adv-product-number" name="product_number" value="{{ advanced_search_params.get('product_number', '') }}">
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-color">색상</label>
@@ -240,7 +249,6 @@
                         <input type="text" id="adv-size" name="size" value="{{ advanced_search_params.get('size', '') }}">
                     </div>
                 </div>
-
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-release-year">출시년도</label>
@@ -251,7 +259,6 @@
                         <input type="text" id="adv-item-category" name="item_category" value="{{ advanced_search_params.get('item_category', '') }}">
                     </div>
                 </div>
-
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-sale-price-min">판매가 (최소)</label>
@@ -262,7 +269,6 @@
                         <input type="number" id="adv-sale-price-max" name="sale_price_max" placeholder="999999" value="{{ advanced_search_params.get('sale_price_max', '') }}">
                     </div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="adv-original-price-min">최초가 (최소)</label>
@@ -273,12 +279,10 @@
                         <input type="number" id="adv-original-price-max" name="original_price_max" placeholder="999999" value="{{ advanced_search_params.get('original_price_max', '') }}">
                     </div>
                 </div>
-
                 <div class="form-group">
                     <label for="adv-min-discount">최소 할인율 (%)</label>
                     <input type="number" id="adv-min-discount" name="min_discount" placeholder="예: 30 (30% 이상)" value="{{ advanced_search_params.get('min_discount', '') }}">
                 </div>
-
                 <div class="modal-actions">
                     <button type="reset" onclick="this.form.reset();">초기화</button>
                     <button type="submit">검색</button>
@@ -289,32 +293,18 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-             // (재고/즐겨찾기 스크립트 - 변경 없음)
+             // (재고/즐겨찾기 스크립트)
              const table = document.querySelector('.stock-table tbody'); if (table) { table.addEventListener('click', function(e) { const button = e.target.closest('button'); if (button && (button.classList.contains('btn-inc') || button.classList.contains('btn-dec'))) { const barcode = button.dataset.barcode; const change = parseInt(button.dataset.change, 10); const changeText = change === 1 ? "증가" : "감소"; if (confirm(`[${barcode}] 상품의 재고를 1 ${changeText}시키겠습니까?`)) { const allButtonsInStack = button.closest('.button-stack').querySelectorAll('button'); allButtonsInStack.forEach(btn => btn.disabled = true); updateStockOnServer(barcode, change, allButtonsInStack); } } }); }
              const favButton = document.getElementById('fav-btn'); if (favButton) { favButton.addEventListener('click', function(e) { const button = e.target; const productNumber = button.dataset.productNumber; button.disabled = true; toggleFavoriteOnServer(productNumber, button); }); }
-             
-             // (*** 6. 신규: 상세검색 모달 JavaScript ***)
+
+             // (상세검색 모달 JavaScript)
              const modal = document.getElementById('advanced-search-modal');
-            
-             // 전역 함수로 선언하여 onclick에서 호출 가능하게 함
-             window.openAdvancedSearch = function() {
-                 if (modal) modal.style.display = 'flex';
-             }
-             window.closeAdvancedSearch = function() {
-                 if (modal) modal.style.display = 'none';
-             }
-             
-             // 오버레이 클릭 시 닫기
-             if (modal) {
-                 modal.addEventListener('click', function(e) {
-                     if (e.target === modal) {
-                         closeAdvancedSearch();
-                     }
-                 });
-             }
+             window.openAdvancedSearch = function() { if (modal) modal.style.display = 'flex'; }
+             window.closeAdvancedSearch = function() { if (modal) modal.style.display = 'none'; }
+             if (modal) { modal.addEventListener('click', function(e) { if (e.target === modal) { closeAdvancedSearch(); } }); }
         });
-        
-        // (재고/즐겨찾기 함수 - 변경 없음)
+
+        // (재고/즐겨찾기 함수)
         function updateStockOnServer(barcode, change, buttons) { fetch("{{ url_for('update_stock') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: barcode, change: change }) }).then(response => response.json()).then(data => { if (data.status === 'success') { const quantitySpan = document.getElementById(`stock-${data.barcode}`); quantitySpan.textContent = data.new_quantity; quantitySpan.classList.toggle('zero', data.new_quantity === 0); } else { alert(`재고 오류: ${data.message}`); } }).catch(error => { console.error('재고 API 오류:', error); alert('서버 통신 오류.'); }).finally(() => { buttons.forEach(btn => btn.disabled = false); }); }
         function toggleFavoriteOnServer(productNumber, button) { fetch("{{ url_for('toggle_favorite') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_number: productNumber }) }).then(response => response.json()).then(data => { if (data.status === 'success') { if (data.new_favorite_status === 1) { button.textContent = '★ 즐겨찾기 해제'; button.classList.add('favorited'); } else { button.textContent = '☆ 즐겨찾기 추가'; button.classList.remove('favorited'); } } else { alert(`즐겨찾기 오류: ${data.message}`); } }).catch(error => { console.error('즐겨찾기 API 오류:', error); alert('서버 통신 오류.'); }).finally(() => { button.disabled = false; }); }
     </script>
