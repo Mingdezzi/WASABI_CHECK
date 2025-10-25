@@ -30,15 +30,6 @@ db = SQLAlchemy(app)
 
 IMAGE_URL_PREFIX = 'https://files.ebizway.co.kr/files/10249/Style/'
 
-# (*** 1. 신규: 이미지 URL Prefix를 모든 템플릿에 전달 ***)
-@app.context_processor
-def inject_image_url_prefix():
-    """
-    모든 Jinja2 템플릿에서 'IMAGE_URL_PREFIX' 변수를 사용할 수 있게 함
-    (예: index.html의 즐겨찾기 목록 이미지 표시용)
-    """
-    return dict(IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
-
 # Google Cloud 인증 정보 경로 설정
 GCP_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 vision_client = None
@@ -59,6 +50,11 @@ else:
             print("Initialized local Google Vision Client.")
         except Exception as e:
             print(f"Error initializing local Google Vision Client: {e}")
+
+# (*** 신규: 이미지 URL Prefix를 모든 템플릿에 전달 ***)
+@app.context_processor
+def inject_image_url_prefix():
+    return dict(IMAGE_URL_PREFIX=IMAGE_URL_PREFIX)
 
 # --- DB 모델 정의 (수정됨) ---
 class Product(db.Model):
@@ -134,7 +130,6 @@ def index():
         showing_favorites = True
         products = Product.query.options(joinedload(Product.variants)).filter(Product.is_favorite == 1).order_by(Product.item_category, Product.product_name).all()
     
-    # (*** 2. 수정: IMAGE_URL_PREFIX 전달 코드 삭제 (컨텍스트 프로세서가 대신함) ***)
     return render_template('index.html', products=products, query=query, showing_favorites=showing_favorites)
 
 # 정렬 함수
@@ -153,21 +148,15 @@ def get_sort_key(variant):
 def product_detail(product_number):
     product = Product.query.get(product_number)
     if product is None: flash("상품 없음.", 'error'); return redirect(url_for('index'))
-    
-    # (*** 이미지 URL 생성 로직 수정 ***)
     image_product_number = product.product_number.split(' ')[0]
-    image_url = f"{IMAGE_URL_PREFIX}{image_product_number}.jpg"
-    
-    variants_list = sorted(product.variants, key=get_sort_key); related_products = []
+    image_url = f"{IMAGE_URL_PREFIX}{image_product_number}.jpg"; variants_list = sorted(product.variants, key=get_sort_key); related_products = []
     if product.product_name:
         search_words = product.product_name.split(' ');
         if search_words:
             search_term = search_words[-1]
             if len(search_term) > 1:
                 related_products = Product.query.filter( Product.product_name.ilike(f'%{search_term}%'), Product.product_number != product_number ).limit(5).all()
-    
     return render_template( 'detail.html', product=product, image_url=image_url, variants=variants_list, related_products=related_products )
-
 
 # --- API 라우트 ---
 @app.route('/barcode_search', methods=['POST'])
@@ -180,6 +169,7 @@ def barcode_search():
     if variant: return jsonify({'status': 'success', 'product_number': variant.product_number})
     else: return jsonify({'status': 'error', 'message': 'DB에 일치하는 바코드 없음.'}), 404
 
+# Google Vision AI를 사용하는 /ocr_upload 함수
 @app.route('/ocr_upload', methods=['POST'])
 def ocr_upload():
     if vision_client is None: return jsonify({'status': 'error', 'message': 'Google Cloud Vision 클라이언트 초기화 실패.'}), 500
@@ -208,14 +198,40 @@ def ocr_upload():
         except Exception as e: print(f"Server OCR Error (Google Vision): {e}"); return jsonify({'status': 'error', 'message': f'서버 OCR 오류: {e}'}), 500
     return jsonify({'status': 'error', 'message': '파일 처리 중 알 수 없는 오류.'}), 500
 
+# (*** 수정된 /text_search 함수 ***)
 @app.route('/text_search', methods=['POST'])
 def text_search():
-    data = request.json; text = data.get('text', '').strip()
-    if not text: return jsonify({'status': 'error', 'message': '텍스트 없음.'}), 400
-    search_term = f'%{text}%'; results = Product.query.filter( or_(Product.product_number.ilike(search_term), Product.product_name.ilike(search_term)) ).all()
-    if len(results) == 1: return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
-    elif len(results) > 1: return jsonify({'status': 'found_many', 'query': text})
-    else: return jsonify({'status': 'not_found', 'message': f'"{text}" 포함 상품 없음.'}), 404
+    data = request.json
+    text_raw = data.get('text', '').strip() # 예: "M 2 4" 또는 "모압 스피드"
+    
+    if not text_raw:
+        return jsonify({'status': 'error', 'message': '검색할 텍스트가 없습니다.'}), 400
+        
+    # 1. 원본 텍스트로 검색 (품명 검색용)
+    search_term_asis = f'%{text_raw}%'
+    
+    # 2. 공백 제거 텍스트로 검색 (품번 검색용)
+    text_cleaned = text_raw.replace(' ', '')
+    search_term_cleaned = f'%{text_cleaned}%'
+
+    # (*** 수정: 3가지 조건으로 검색 ***)
+    results = Product.query.filter(
+        or_(
+            Product.product_name.ilike(search_term_asis), # 1. 품명 (공백 포함)
+            Product.product_number.ilike(search_term_asis), # 2. 품번 (공백 포함 - 혹시 모르니)
+            Product.product_number.ilike(search_term_cleaned)  # 3. 품번 (공백 제거)
+        )
+    ).all()
+    
+    if len(results) == 1:
+        # 딱 1개 찾았을 때 -> 상세 페이지로 이동
+        return jsonify({'status': 'found_one', 'product_number': results[0].product_number})
+    elif len(results) > 1:
+        # 여러 개 찾았을 때 -> 검색 결과 페이지로 이동 (원본 텍스트 기준)
+        return jsonify({'status': 'found_many', 'query': text_raw})
+    else:
+        # 하나도 못 찾았을 때
+        return jsonify({'status': 'not_found', 'message': f'"{text_raw}" 포함 상품 없음.'}), 404
 
 @app.route('/update_stock', methods=['POST'])
 def update_stock():
