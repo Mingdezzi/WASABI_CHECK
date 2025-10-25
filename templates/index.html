@@ -8,12 +8,7 @@
 
     <style>
         /* (기본 스타일) */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0;
-            padding: 20px; /* 하단 여백 제거 */
-            background-color: #f0f2f5;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f2f5; }
         .container { max-width: 800px; margin: 0 auto; }
         .card { background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; padding: 24px; }
         h1 { color: #2d8b57; margin: 0 0 24px 0; text-align: center; font-size: 2em; }
@@ -83,10 +78,6 @@
         .item-details .meta-item { white-space: nowrap; }
         .item-details .sale-price { font-weight: 500; }
         .item-details .discount { color: #dc3545; font-weight: 500; }
-        .search-result-item a { display: block; padding: 16px; text-decoration: none; color: #333; border: 1px solid #eee; border-radius: 6px; transition: background-color 0.2s, box-shadow 0.2s; }
-        .search-result-item a:hover { background-color: #fcfcfc; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .search-result-item .product-name { font-weight: 600; font-size: 1.1em; }
-        .search-result-item .product-number { font-size: 0.9em; color: #555; margin-top: 5px; }
 
         /* (임포트 스타일) */
         .import-section h3 { margin-top: 0; }
@@ -224,43 +215,45 @@
         </div>
 
         <div class="card">
-            {% if showing_favorites %} <h2>즐겨찾기 목록</h2> {% else %} <h2>상품 검색 결과</h2> {% endif %}
+            {% if showing_favorites %} <h2>즐겨찾기 목록</h2>
+            {% elif showing_all %} <h2>전체 목록</h2>
+            {% else %} <h2>상품 검색 결과</h2> {% endif %}
+
             <ul class="product-list">
                 {% for product in products %}
-                    {% if showing_favorites %}
-                        <li>
-                            <a href="{{ url_for('product_detail', product_number=product.product_number) }}" class="product-item">
-                                {% set image_pn = product.product_number.split(' ')[0] %}
-                                <img src="{{ IMAGE_URL_PREFIX }}{{ image_pn }}.jpg" alt="{{ product.product_name }}" class="item-image" onerror="this.style.visibility='hidden'">
-                                <div class="item-details">
-                                    <div class="product-name">{{ product.product_name }}</div>
-                                    <div class="product-meta">
-                                        <span class="meta-item">{{ product.product_number }}</span>
-                                        {% if product.variants %}
-                                            {% set colors = product.variants | map(attribute='color') | unique | sort | join(', ') %}
-                                            {% if colors %} <span class="meta-item">{{ colors }}</span> {% endif %}
-                                            {% set first_variant = product.variants[0] %}
-                                            <span class="meta-item sale-price">{{ "{:,d}".format(first_variant.sale_price) }}</span>
-                                            {% if first_variant.original_price and first_variant.original_price > 0 %}
-                                                <span class="meta-item discount">{{ ((1 - (first_variant.sale_price / first_variant.original_price)) * 100) | int }}%</span>
-                                            {% else %}
-                                                <span class="meta-item discount">0%</span>
-                                            {% endif %}
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="search-result-item">
-                            <a href="{{ url_for('product_detail', product_number=product.product_number) }}">
-                                <div class="product-name">{{ product.product_name }}</div>
-                                <div class="product-number">{{ product.product_number }}</div>
-                            </a>
-                        </li>
-                    {% endif %}
+                <li>
+                    <a href="{{ url_for('product_detail', product_number=product.product_number) }}" class="product-item">
+                        {% set image_pn = product.product_number.split(' ')[0] %}
+                        <img src="{{ IMAGE_URL_PREFIX }}{{ image_pn }}.jpg" alt="{{ product.product_name }}" class="item-image" onerror="this.style.visibility='hidden'">
+                        <div class="item-details">
+                            <div class="product-name">{{ product.product_name }}</div>
+                            <div class="product-meta">
+                                <span class="meta-item">{{ product.product_number }}</span>
+                                {% if product.variants %}
+                                    {% set colors = product.variants | map(attribute='color') | unique | sort | join(', ') %}
+                                    {% if colors %} <span class="meta-item">{{ colors }}</span> {% endif %}
+                                    {# 첫 번째 variant를 기준으로 가격/할인율 표시 #}
+                                    {% set first_variant = product.variants[0] %}
+                                    <span class="meta-item sale-price">{{ "{:,d}".format(first_variant.sale_price) }}</span>
+                                    {# 할인율 계산: 최초가가 있고 0보다 클 때만 #}
+                                    {% if first_variant.original_price and first_variant.original_price > 0 %}
+                                        <span class="meta-item discount">{{ ((1 - (first_variant.sale_price / first_variant.original_price)) * 100) | int }}%</span>
+                                    {% else %}
+                                        <span class="meta-item discount">0%</span> {# 최초가 없거나 0이면 0% #}
+                                    {% endif %}
+                                {% else %}
+                                    {# Variant 정보가 없는 경우 (데이터 오류 등) #}
+                                    <span class="meta-item sale-price">가격정보없음</span>
+                                    <span class="meta-item discount">-%</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                </li>
                 {% else %}
+                    {# 검색 결과 또는 목록이 없을 때 메시지 표시 #}
                     {% if showing_favorites %} <li style="text-align: center; padding: 20px; color: #555;">즐겨찾기된 상품이 없습니다.</li>
+                    {% elif showing_all %} <li style="text-align: center; padding: 20px; color: #555;">상품 목록이 비어 있습니다.</li>
                     {% else %} <li style="text-align: center; padding: 20px; color: #555;">검색된 상품이 없습니다.</li> {% endif %}
                 {% endfor %}
             </ul>
