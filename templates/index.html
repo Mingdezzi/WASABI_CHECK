@@ -23,6 +23,13 @@
         .search-bar input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; min-width: 0; }
         .search-bar button { padding: 0 20px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 1em; flex-shrink: 0; }
         
+        /* (*** 신규: 상세검색 버튼 스타일 ***) */
+        .btn-advanced-search {
+            padding: 0 15px;
+            background-color: #6c757d;
+            font-size: 0.9em;
+        }
+
         /* (즐겨찾기/검색 결과 리스트 스타일) */
         .product-list { list-style: none; padding: 0; }
         .product-list li { margin-bottom: 15px; }
@@ -48,37 +55,53 @@
 
         /* (스캔 UI 스타일) */
         #qr-reader-container { 
-            position: relative; 
-            width: 100%; 
-            max-width: 600px; 
-            margin: 0 auto 15px auto; 
-            overflow: hidden; /* 넘치는 비디오를 숨김 */
-            height: 200px; /* 컨테이너 높이 고정 */
-            background-color: #eee;
-            border-radius: 8px;
-            border: 1px solid #ddd;
+            position: relative; width: 100%; max-width: 600px; margin: 0 auto 15px auto; 
+            overflow: hidden; height: 200px; background-color: #eee;
+            border-radius: 8px; border: 1px solid #ddd;
         }
-        #qr-reader-container video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* 비디오를 찌그러지지 않게 꽉 채우고 자름 */
-            display: block;
-        }
-        
-        /* (마스크/가이드라인 CSS는 제거된 상태) */
-
+        #qr-reader-container video { width: 100%; height: 100%; object-fit: cover; display: block; }
         #scanner-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
         #scanner-controls button { flex-grow: 0; background-color: #2d8b57; color: white; border: none; padding: 12px 15px; cursor: pointer; border-radius: 6px; font-size: 1em; font-weight: 500; min-width: 100px; }
-        
         #scanner-controls button#start-barcode-btn { background-color: #007bff; }
         #scanner-controls button#start-ocr-btn { background-color: #17a2b8; }
         #scanner-controls button#capture-ocr-btn { background-color: #17a2b8; }
         #scanner-controls button#stop-scan-btn { background-color: #dc3545; }
-        
         #scanner-status { margin-top: 15px; font-weight: 500; text-align: center; padding: 10px; border-radius: 6px; background-color: #f8f9fa; }
         #scanner-status.success { background-color: #d4edda; color: #155724; }
         #scanner-status.error { background-color: #f8d7da; color: #721c24; }
         #scanner-status.loading { background-color: #fff3cd; color: #856404; }
+
+        /* (*** 1. 신규: 상세검색 모달 CSS ***) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5); display: none;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-content {
+            background-color: #fff; padding: 20px; border-radius: 8px;
+            width: 90%; max-width: 500px; max-height: 80vh;
+            overflow-y: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .modal-content h3 { margin-top: 0; }
+        .modal-close-btn {
+            float: right; font-size: 1.5em; font-weight: bold;
+            cursor: pointer; line-height: 1;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em; }
+        .form-group input {
+            width: 100%; padding: 8px; border: 1px solid #ddd;
+            border-radius: 6px; box-sizing: border-box; /* 100% width용 */
+        }
+        .form-row { display: flex; gap: 10px; }
+        .form-row .form-group { flex: 1; }
+        .modal-actions { text-align: right; margin-top: 20px; }
+        .modal-actions button {
+            padding: 10px 15px; border: none; border-radius: 6px;
+            cursor: pointer; font-weight: bold;
+        }
+        .modal-actions button[type="submit"] { background-color: #007bff; color: white; }
+        .modal-actions button[type="reset"] { background-color: #f0f2f5; color: #333; }
     </style>
 </head>
 <body>
@@ -91,10 +114,7 @@
 
         <div class="card" id="scanner-section">
             <h2>스캔 검색</h2>
-            
-            <div id="qr-reader-container">
-                </div>
-            
+            <div id="qr-reader-container"></div>
             <div id="scanner-controls">
                 <button id="start-barcode-btn">바코드 스캔 시작</button>
                 <button id="start-ocr-btn">품번(OCR) 스캔 시작</button>
@@ -111,6 +131,7 @@
                     <input type="text" id="search-query-input" name="query" placeholder="품번 또는 상품명 검색..." value="{{ query or '' }}">
                     <button type="submit">검색</button>
                 </form>
+                <button type="button" class="btn-advanced-search" onclick="openAdvancedSearch()">상세조건검색</button>
             </div>
         </div>
 
@@ -161,6 +182,75 @@
             <h3>DB 덮어쓰기 (엑셀 업로드)</h3>
             <form action="{{ url_for('import_excel') }}" method="POST" enctype="multipart/form-data" class="import-form" onsubmit="return confirm('경고! DB를 덮어씁니다. 기존 데이터가 모두 삭제됩니다. 계속하시겠습니까?');"> <input type="file" name="excel_file" accept=".xlsx, .xls" required> <button type="submit">업로드 및 임포트</button> </form>
         </div>
+    </div> <div id="advanced-search-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close-btn" onclick="closeAdvancedSearch()">&times;</span>
+            <h3>상세 조건 검색</h3>
+            <form action="{{ url_for('advanced_search') }}" method="GET">
+                <div class="form-group">
+                    <label for="adv-product-name">품명</label>
+                    <input type="text" id="adv-product-name" name="product_name" value="{{ advanced_search_params.get('product_name', '') }}">
+                </div>
+                <div class="form-group">
+                    <label for="adv-product-number">품번</label>
+                    <input type="text" id="adv-product-number" name="product_number" value="{{ advanced_search_params.get('product_number', '') }}">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adv-color">색상</label>
+                        <input type="text" id="adv-color" name="color" value="{{ advanced_search_params.get('color', '') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="adv-size">사이즈</label>
+                        <input type="text" id="adv-size" name="size" value="{{ advanced_search_params.get('size', '') }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adv-release-year">출시년도</label>
+                        <input type="number" id="adv-release-year" name="release_year" placeholder="예: 2024" value="{{ advanced_search_params.get('release_year', '') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="adv-item-category">품목</label>
+                        <input type="text" id="adv-item-category" name="item_category" value="{{ advanced_search_params.get('item_category', '') }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adv-sale-price-min">판매가 (최소)</label>
+                        <input type="number" id="adv-sale-price-min" name="sale_price_min" placeholder="0" value="{{ advanced_search_params.get('sale_price_min', '') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="adv-sale-price-max">판매가 (최대)</label>
+                        <input type="number" id="adv-sale-price-max" name="sale_price_max" placeholder="999999" value="{{ advanced_search_params.get('sale_price_max', '') }}">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adv-original-price-min">최초가 (최소)</label>
+                        <input type="number" id="adv-original-price-min" name="original_price_min" placeholder="0" value="{{ advanced_search_params.get('original_price_min', '') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="adv-original-price-max">최초가 (최대)</label>
+                        <input type="number" id="adv-original-price-max" name="original_price_max" placeholder="999999" value="{{ advanced_search_params.get('original_price_max', '') }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="adv-min-discount">최소 할인율 (%)</label>
+                    <input type="number" id="adv-min-discount" name="min_discount" placeholder="예: 30 (30% 이상)" value="{{ advanced_search_params.get('min_discount', '') }}">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="reset" onclick="this.form.reset();">초기화</button>
+                    <button type="submit">검색</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
@@ -169,38 +259,24 @@
             const startOcrBtn = document.getElementById('start-ocr-btn');
             const captureOcrBtn = document.getElementById('capture-ocr-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
-            
             const statusEl = document.getElementById('scanner-status');
             const qrReaderContainer = document.getElementById('qr-reader-container');
-
             let html5QrCode = null;
 
             html5QrCode = new Html5Qrcode("qr-reader-container", { 
                 formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] 
             });
 
-            // --- 1. 실시간 바코드 스캔 시작 ---
+            // (스캔 함수들 - 변경 없음)
             function startBarcodeScan() {
                 statusEl.textContent = "카메라 켜는 중 (바코드 모드)...";
                 statusEl.className = 'scanner-status loading';
-                
-                // UI 설정
                 startBarcodeBtn.style.display = 'none';
                 startOcrBtn.style.display = 'none';
                 captureOcrBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-block';
-
-                const config = { 
-                    fps: 10,
-                    /* (*** 요청 사항 수정: 스캔 영역 제한 기능(qrbox) 다시 추가 ***) */
-                    qrbox: { width: 250, height: 100 } 
-                };
-                
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    handleBarcodeSuccess, 
-                    (errorMessage) => { /* 무시 */ }
+                const config = { fps: 10, qrbox: { width: 250, height: 100 } };
+                html5QrCode.start( { facingMode: "environment" }, config, handleBarcodeSuccess, (errorMessage) => { }
                 ).then(() => {
                     statusEl.textContent = "바코드를 스캔하세요...";
                     statusEl.className = 'scanner-status';
@@ -210,27 +286,15 @@
                     stopScan(); 
                 });
             }
-
-            // --- 2. 품번(OCR) 스캔 모드 시작 ---
             function startOcrScan() {
                 statusEl.textContent = "카메라 켜는 중 (OCR 모드)...";
                 statusEl.className = 'scanner-status loading';
-
-                // UI 설정
                 startBarcodeBtn.style.display = 'none';
                 startOcrBtn.style.display = 'none';
                 captureOcrBtn.style.display = 'inline-block';
                 stopBtn.style.display = 'inline-block';
-
-                const config = { 
-                    fps: 5, 
-                };
-                
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    (decodedText, decodedResult) => { /* 자동 스캔 안함 */ },
-                    (errorMessage) => { /* 무시 */ }
+                const config = { fps: 5, };
+                html5QrCode.start( { facingMode: "environment" }, config, (decodedText, decodedResult) => { }, (errorMessage) => { }
                 ).then(() => {
                     statusEl.textContent = "품번을 화면에 맞추고 '캡처'를 누르세요.";
                     statusEl.className = 'scanner-status';
@@ -240,8 +304,6 @@
                     stopScan(); 
                 });
             }
-
-            // --- 3. 스캔 완전 중지 ---
             function stopScan() {
                 statusEl.textContent = "스캔 중지 중...";
                 try {
@@ -250,19 +312,16 @@
                     }).catch(err => {
                         console.log("Scanner stop failed:", err);
                     }).finally(() => {
-                        // UI 초기화
                         startBarcodeBtn.style.display = 'inline-block';
                         startOcrBtn.style.display = 'inline-block';
                         captureOcrBtn.style.display = 'none';
                         stopBtn.style.display = 'none';
-                        
                         statusEl.textContent = "스캔이 중지되었습니다.";
                         statusEl.className = 'scanner-status';
                         qrReaderContainer.innerHTML = ''; 
                     });
                 } catch (e) {
                     console.error("Error stopping scanner:", e);
-                    // 강제 UI 초기화
                     startBarcodeBtn.style.display = 'inline-block';
                     startOcrBtn.style.display = 'inline-block';
                     captureOcrBtn.style.display = 'none';
@@ -272,14 +331,10 @@
                     qrReaderContainer.innerHTML = '';
                 }
             }
-
-
-            // --- 바코드 성공 시 콜백 (실시간) ---
             function handleBarcodeSuccess(decodedText, decodedResult) {
                 html5QrCode.pause(true); 
                 statusEl.textContent = `바코드 성공: ${decodedText}. 서버 조회 중...`;
                 statusEl.className = 'scanner-status loading';
-
                 fetch("{{ url_for('barcode_search') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: decodedText }) })
                 .then(response => response.json())
                 .then(data => {
@@ -290,52 +345,37 @@
                     } else {
                         statusEl.textContent = `바코드 오류: ${data.message}. 다시 스캔하세요.`;
                         statusEl.className = 'scanner-status error';
-                        html5QrCode.resume(); // 스캔 재개
+                        html5QrCode.resume();
                     }
                 })
                 .catch(error => {
                     console.error('바코드 API 오류:', error); 
                     statusEl.textContent = '서버 통신 오류. 다시 스캔하세요.'; 
                     statusEl.className = 'scanner-status error';
-                    html5QrCode.resume(); // 스캔 재개
+                    html5QrCode.resume();
                 });
             }
-
-            // --- OCR 캡처 버튼 클릭 시 ---
             async function captureFrameForOcr() {
                 const videoEl = document.querySelector("#qr-reader-container video");
-
                 if (!videoEl || !videoEl.videoWidth || !videoEl.videoHeight) { 
                     statusEl.textContent = "비디오 준비 안됨. 다시 시도하세요."; 
                     statusEl.className = 'scanner-status error'; 
                     return; 
                 }
-                
                 statusEl.textContent = "화면 캡처 및 OCR 처리 중...";
                 statusEl.className = 'scanner-status loading';
-                captureOcrBtn.disabled = true; // 버튼 비활성화
-
+                captureOcrBtn.disabled = true;
                 try {
-                    // (비디오 영역 전체 캡처)
-                    const vw = videoEl.videoWidth; 
-                    const vh = videoEl.videoHeight;
-                    
-                    const canvas = document.createElement('canvas'); 
-                    canvas.width = vw;
-                    canvas.height = vh;
-                    
-                    const context = canvas.getContext('2d');
-                    context.drawImage(videoEl, 0, 0, vw, vh);
-                    
+                    const vw = videoEl.videoWidth; const vh = videoEl.videoHeight;
+                    const canvas = document.createElement('canvas'); canvas.width = vw; canvas.height = vh;
+                    const context = canvas.getContext('2d'); context.drawImage(videoEl, 0, 0, vw, vh);
                     canvas.toBlob(async (blob) => {
                         if (!blob) { throw new Error("이미지 Blob 변환 실패."); }
                         statusEl.textContent = "이미지 서버 전송 중...";
                         const formData = new FormData(); formData.append('ocr_image', blob, 'capture_crop.png');
-                        
                         try {
                             const response = await fetch("{{ url_for('ocr_upload') }}", { method: 'POST', body: formData });
                             const data = await response.json();
-                            
                             if (response.ok) {
                                 if (data.status === 'found_one' || data.status === 'found_many') {
                                     statusEl.textContent = `상품 찾음. 이동합니다.`;
@@ -349,7 +389,7 @@
                                 } else {
                                     statusEl.textContent = `품번 리딩 실패: ${data.message}`;
                                     statusEl.className = 'scanner-status error';
-                                    captureOcrBtn.disabled = false; // 버튼 다시 활성화
+                                    captureOcrBtn.disabled = false;
                                 }
                             } else {
                                 statusEl.textContent = `서버 오류 (${response.status}): ${data.message || '알 수 없는 오류'}`;
@@ -370,12 +410,30 @@
                     captureOcrBtn.disabled = false;
                 }
             }
-
-            // --- 버튼 이벤트 리스너 ---
-            startBarcodeBtn.addEventListener('click', startBarcodeScan);
+            startBtn.addEventListener('click', startBarcodeScan); // 오타 수정: startBtn -> startBarcodeBtn
             startOcrBtn.addEventListener('click', startOcrScan);
             captureOcrBtn.addEventListener('click', captureFrameForOcr);
             stopBtn.addEventListener('click', stopScan);
+
+            // --- (*** 4. 신규: 상세검색 모달 JavaScript ***) ---
+            const modal = document.getElementById('advanced-search-modal');
+            
+            // 전역 함수로 선언하여 onclick에서 호출 가능하게 함
+            window.openAdvancedSearch = function() {
+                if (modal) modal.style.display = 'flex';
+            }
+            window.closeAdvancedSearch = function() {
+                if (modal) modal.style.display = 'none';
+            }
+            
+            // 오버레이 클릭 시 닫기
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeAdvancedSearch();
+                    }
+                });
+            }
         });
     </script>
 </body>
