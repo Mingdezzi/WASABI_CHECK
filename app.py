@@ -139,7 +139,8 @@ def index():
         products=products,
         query=query,
         showing_favorites=showing_favorites,
-        showing_all=False, # 홈 또는 검색 결과는 '전체 목록'이 아님
+        showing_all=False,
+        is_direct_search_page=False, # 상세 정보 직접 검색 페이지 아님
         advanced_search_params={}
     )
 
@@ -150,9 +151,10 @@ def all_products():
         return render_template(
             'index.html',
             products=products,
-            query="전체 목록", # 페이지 상단에 표시될 제목
-            showing_favorites=False, # 즐겨찾기 목록 아님
-            showing_all=True,      # '전체 목록' 탭 활성화용
+            query="전체 목록",
+            showing_favorites=False,
+            showing_all=True,
+            is_direct_search_page=False, # 상세 정보 직접 검색 페이지 아님
             advanced_search_params={}
         )
     except Exception as e:
@@ -241,12 +243,35 @@ def advanced_search():
             products=products,
             query=query_summary,
             showing_favorites=False,
-            showing_all=False, # 상세 검색 결과는 '전체 목록'이 아님
+            showing_all=False,
+            is_direct_search_page=False, # 상세 정보 직접 검색 페이지 아님
             advanced_search_params=params
         )
     except Exception as e:
         flash(f"검색 오류: {e}", 'error')
         return redirect(url_for('index'))
+
+@app.route('/direct_search')
+def direct_search():
+    # 이 페이지는 is_direct_search_page=True로 렌더링
+    return render_template('direct_search.html', is_direct_search_page=True)
+
+@app.route('/find_product', methods=['POST'])
+def find_product():
+    product_number = request.form.get('product_number', '').strip()
+    if not product_number:
+        flash('품번을 입력해주세요.', 'error')
+        return redirect(url_for('direct_search'))
+
+    product = Product.query.get(product_number) # 기본 키로 바로 조회
+
+    if product:
+        # 상품 있으면 상세 페이지로 리디렉션
+        return redirect(url_for('product_detail', product_number=product.product_number))
+    else:
+        # 상품 없으면 메시지와 함께 직접 검색 페이지로 다시 리디렉션
+        flash(f'품번 "{product_number}"에 해당하는 상품이 없습니다.', 'error')
+        return redirect(url_for('direct_search'))
 
 # 정렬 함수
 def get_sort_key(variant):
@@ -279,7 +304,8 @@ def product_detail(product_number):
         image_url=image_url,
         variants=variants_list,
         related_products=related_products,
-        showing_all=False, # 상세 페이지는 '전체 목록'이 아님
+        showing_all=False,
+        is_direct_search_page=False, # 상세 페이지는 직접 검색 페이지 아님
         advanced_search_params={}
     )
 
