@@ -140,7 +140,7 @@ def index():
         query=query,
         showing_favorites=showing_favorites,
         showing_all=False,
-        is_direct_search_page=False, # 상세 정보 직접 검색 페이지 아님
+        is_direct_search_page=False,
         advanced_search_params={}
     )
 
@@ -154,7 +154,7 @@ def all_products():
             query="전체 목록",
             showing_favorites=False,
             showing_all=True,
-            is_direct_search_page=False, # 상세 정보 직접 검색 페이지 아님
+            is_direct_search_page=False,
             advanced_search_params={}
         )
     except Exception as e:
@@ -164,7 +164,7 @@ def all_products():
 @app.route('/advanced_search')
 def advanced_search():
     try:
-        query = Product.query.options(joinedload(Product.variants)).join(Product.variants) # Join 추가
+        query = Product.query.options(joinedload(Product.variants)).join(Product.variants)
 
         params = request.args
         search_active = False
@@ -244,7 +244,7 @@ def advanced_search():
             query=query_summary,
             showing_favorites=False,
             showing_all=False,
-            is_direct_search_page=False, # 상세 정보 직접 검색 페이지 아님
+            is_direct_search_page=False,
             advanced_search_params=params
         )
     except Exception as e:
@@ -253,25 +253,33 @@ def advanced_search():
 
 @app.route('/direct_search')
 def direct_search():
-    # 이 페이지는 is_direct_search_page=True로 렌더링
     return render_template('direct_search.html', is_direct_search_page=True)
 
+# (*** 수정: find_product 함수 로직 변경 ***)
 @app.route('/find_product', methods=['POST'])
 def find_product():
-    product_number = request.form.get('product_number', '').strip()
-    if not product_number:
+    product_number_query = request.form.get('product_number', '').strip()
+    if not product_number_query:
         flash('품번을 입력해주세요.', 'error')
         return redirect(url_for('direct_search'))
 
-    product = Product.query.get(product_number) # 기본 키로 바로 조회
+    search_term = f'%{product_number_query}%'
+    # 대소문자 구분 없이 부분 일치 검색
+    results = Product.query.filter(Product.product_number.ilike(search_term)).all()
 
-    if product:
-        # 상품 있으면 상세 페이지로 리디렉션
-        return redirect(url_for('product_detail', product_number=product.product_number))
+    if len(results) == 1:
+        # 정확히 1개 찾으면 상세 페이지로 이동
+        return redirect(url_for('product_detail', product_number=results[0].product_number))
+    elif len(results) > 1:
+        # 여러 개 찾으면 검색 결과 목록 페이지(index)로 이동
+        flash(f'"{product_number_query}"(으)로 시작하는 품번이 여러 개 있습니다.', 'info')
+        # 검색어를 query 파라미터로 넘겨서 index 페이지에서 검색 결과 표시
+        return redirect(url_for('index', query=product_number_query))
     else:
-        # 상품 없으면 메시지와 함께 직접 검색 페이지로 다시 리디렉션
-        flash(f'품번 "{product_number}"에 해당하는 상품이 없습니다.', 'error')
+        # 하나도 못 찾으면 메시지와 함께 직접 검색 페이지로 다시 리디렉션
+        flash(f'품번 "{product_number_query}"에 해당하는 상품이 없습니다.', 'error')
         return redirect(url_for('direct_search'))
+
 
 # 정렬 함수
 def get_sort_key(variant):
@@ -305,7 +313,7 @@ def product_detail(product_number):
         variants=variants_list,
         related_products=related_products,
         showing_all=False,
-        is_direct_search_page=False, # 상세 페이지는 직접 검색 페이지 아님
+        is_direct_search_page=False,
         advanced_search_params={}
     )
 
